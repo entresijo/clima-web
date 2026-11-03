@@ -612,6 +612,8 @@ function tiraDatos() {
   // Radar del OHMC: el núcleo más cercano y la intensidad cerca del pueblo. Escala del OHMC: 40-50 lluvia
   // intensa, 60 o más lluvia muy intensa y granizo. No asegura ver el pueblo: la sierra puede tapar.
   var rd = UI.loc ? null : L.radar;
+  // Sin radar fresco se dice, en vez de que la fila desaparezca.
+  if (!UI.loc && !rd) poner("Riesgos", "rayo", "Sin datos", "Radar", "Nada de los últimos 40 minutos", clave("Viene de", "radar del OHMC, leído del VPS", "Qué pasa", "el VPS no respondió o el radar no publicó en los últimos 40 minutos"));
   if (rd) {
     var rc = rd.cercano ? rd.radares[rd.cercano] : null, claveRadar = clave("Viene de", "radar del OHMC (WebMet), cada 10 min, leído desde " + (rd.desde || ""), "Ojo", "el haz pasa alto y la sierra puede tapar: no asegura ver el pueblo", "Hora", rd.hora);
     poner("Riesgos", "rayo", rc ? marcado("rayo_km", rc.nucleo_km, Math.round(rc.nucleo_km) + " km") : "Ninguno", "Radar: núcleo de tormenta",
