@@ -590,6 +590,17 @@ function tiraDatos() {
   poner("Riesgos", "rayo", hay(cape) ? marcado("cape", cape, nivelCAPE(cape)) : null, "Energía para tormentas", hay(cape) ? "CAPE " + fmt(Math.round(cape)) + " J/kg, alta desde " + umbral("OM_CAPE_TORMENTA") : "",
     clave("Escala", "CAPE máximo, en J/kg: baja hasta 250, media hasta " + umbral("OM_CAPE_TORMENTA") + ", alta desde ahí", "Cortes", "los del boletín, calibrados con los rayos del GOES-19"));
   poner("Riesgos", "fuego", hay(d.fwi_hoy) ? marcado("fwi", d.fwi_hoy, nivelFWI(d.fwi_hoy)) : null, "Riesgo de incendio", hay(d.fwi_hoy) ? "FWI " + fmt(Math.round(d.fwi_hoy * 10) / 10) : "");
+  // Del VPS, solo en el panel y para la localidad del boletín: rayos y focos de calor cerca.
+  var sat = UI.loc ? null : ((L.satelite || {}).partes || {});
+  if (sat && sat.rayos && sat.rayos.estado === "ok" && sat.rayos.dato) {
+    var ry = sat.rayos.dato;
+    poner("Riesgos", "rayo", marcado("rayos", ry.rayos_20km, String(ry.rayos_20km)), "Rayos a 20 km", ry.mas_cercano_km !== null && ry.mas_cercano_km !== undefined ? "El más cercano a " + ry.mas_cercano_km + " km" + (ry.rumbo ? " al " + ry.rumbo : "") : "Últimos " + (ry.ventana_min || 15) + " min, GOES-19",
+      clave("Viene de", "la capa satelital del VPS: rayos del GOES-19 (GLM)", "Ventana", (ry.ventana_min || 15) + " minutos", "Hace", sat.rayos.hace_min + " min"));
+  }
+  if (sat && sat.focos && sat.focos.estado === "ok" && sat.focos.dato && hay(sat.focos.dato.focos)) {
+    poner("Riesgos", "fuego", marcado("focos", sat.focos.dato.focos, String(sat.focos.dato.focos)), "Focos de calor a 50 km", sat.focos.dato.focos ? "El más cercano a " + sat.focos.dato.mas_cercano_km + " km" : "Imagen del satélite",
+      clave("Viene de", "la capa satelital del VPS: GOES-19 (FDC)", "Ojo", "un foco no es un incendio confirmado"));
+  }
   poner("Riesgos", "suelo", hay(suelo) ? fmt(Math.round(suelo * 10) / 10) + "°" : null, "Mínima del suelo");
   var sale = as.sale_sol || (ca.sol && ca.sol.sale), pone = as.pone_sol || (ca.sol && ca.sol.pone);
   poner("Sol y luna", "amanecer", sale ? sale + " · " + pone : null, "Salida y puesta de sol", "", clave("Viene de", as.sale_sol ? "WeatherAPI, consultado por el panel" : "calculado por el panel"));
@@ -1468,6 +1479,8 @@ var ESCALA = {
   calor: [[34, "amarillo"], [38, "naranja"], [41, "rojo"]],
   frio: [[3, "amarillo"], [0, "rojo"]],
   prob: [[70, "amarillo"]],
+  rayos: [[1, "amarillo"], [20, "naranja"]],
+  focos: [[1, "naranja"]],
   cape: [[800, "amarillo"], [2500, "naranja"], [4000, "rojo"]],
   fwi: [[15, "amarillo"], [28, "naranja"], [46, "rojo"]],
   uv: [[3, "amarillo"], [6, "naranja"], [8, "rojo"], [11, "violeta"]],
@@ -1477,7 +1490,7 @@ var ESCALA_PATAGONIA = {
   rafaga: [[80, "amarillo"], [110, "naranja"], [140, "rojo"]],
   viento: [[65, "amarillo"], [90, "naranja"], [110, "rojo"]]
 };
-var NOMBRE_ESCALA = { rafaga: "Ráfaga, SMN", viento: "Viento sostenido, SMN", lluvia: "Lluvia, SMN", calor: "Temperatura alta", frio: "Helada", prob: "Probabilidad de lluvia", cape: "CAPE en J/kg", fwi: "FWI, escala de Córdoba", uv: "Índice UV, OMS", aire: "Índice de aire, EPA" };
+var NOMBRE_ESCALA = { rafaga: "Ráfaga, SMN", viento: "Viento sostenido, SMN", lluvia: "Lluvia, SMN", calor: "Temperatura alta", frio: "Helada", prob: "Probabilidad de lluvia", rayos: "Rayos a 20 km", focos: "Focos de calor", cape: "CAPE en J/kg", fwi: "FWI, escala de Córdoba", uv: "Índice UV, OMS", aire: "Índice de aire, EPA" };
 var COL = { ohmc: "var(--f-ohmc)", weatherapi: "var(--f-weatherapi)", openmeteo: "var(--f-openmeteo)",
   smn: "var(--f-smn)", fwi: "var(--f-fwi)", goes: "var(--f-goes)", calculado: "var(--f-calculado)" };
 var HORA = 3600000, DIA = 24 * HORA, MINIMO_VISTA = 3 * HORA;
