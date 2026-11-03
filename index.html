@@ -593,9 +593,11 @@ function tiraDatos() {
   // Del VPS, solo en el panel y para la localidad del boletín: rayos y focos de calor cerca.
   var sat = UI.loc ? null : ((L.satelite || {}).partes || {});
   if (sat && sat.rayos && sat.rayos.estado === "ok" && sat.rayos.dato) {
-    var ry = sat.rayos.dato;
-    poner("Riesgos", "rayo", marcado("rayos", ry.rayos_20km, String(ry.rayos_20km)), "Rayos a 20 km", ry.mas_cercano_km !== null && ry.mas_cercano_km !== undefined ? "El más cercano a " + ry.mas_cercano_km + " km" + (ry.rumbo ? " al " + ry.rumbo : "") : "Últimos " + (ry.ventana_min || 15) + " min, GOES-19",
-      clave("Viene de", "la capa satelital del VPS: rayos del GOES-19 (GLM)", "Ventana", (ry.ventana_min || 15) + " minutos", "Hace", sat.rayos.hace_min + " min"));
+    // A 50 km una tormenta está a más de una hora; a 20, a menos de media. El color sigue al más cercano.
+    var ry = sat.rayos.dato, hayRayo = hay(ry.mas_cercano_km), tend = L.satelite_tendencia;
+    poner("Riesgos", "rayo", hayRayo ? marcado("rayo_km", ry.mas_cercano_km, ry.rayos_50km + (ry.rayos_50km === 1 ? " rayo" : " rayos")) : "0", "Rayos a 50 km",
+      hayRayo ? "El más cercano a " + ry.mas_cercano_km + " km" + (ry.rumbo ? " al " + ry.rumbo : "") + (ry.rayos_20km ? ", " + ry.rayos_20km + " a 20 km" : "") + (tend ? " · " + tend : "") : "Ninguno en los últimos " + (ry.ventana_min || 15) + " min",
+      clave("Viene de", "la capa satelital del VPS: rayos del GOES-19 (GLM)", "Color", "amarillo a 50 km o menos, naranja a 20, rojo a 10", "Tendencia", "comparando el más cercano con la lectura anterior", "Hace", sat.rayos.hace_min + " min"));
   }
   if (sat && sat.focos && sat.focos.estado === "ok" && sat.focos.dato && hay(sat.focos.dato.focos)) {
     poner("Riesgos", "fuego", marcado("focos", sat.focos.dato.focos, String(sat.focos.dato.focos)), "Focos de calor a 50 km", sat.focos.dato.focos ? "El más cercano a " + sat.focos.dato.mas_cercano_km + " km" : "Imagen del satélite",
@@ -762,7 +764,8 @@ function escalaDe(tipo) {
 function colorDe(tipo, v) {
   var n = parseFloat(v), c = "";
   if (isNaN(n)) return "";
-  escalaDe(tipo).forEach(function (x) { if (tipo === "frio" ? n <= x[0] : n >= x[0]) c = x[1]; });
+  var baja = tipo === "frio" || tipo === "rayo_km";
+  escalaDe(tipo).forEach(function (x) { if (baja ? n <= x[0] : n >= x[0]) c = x[1]; });
   return c;
 }
 function marcado(tipo, v, texto) {
@@ -1479,7 +1482,7 @@ var ESCALA = {
   calor: [[34, "amarillo"], [38, "naranja"], [41, "rojo"]],
   frio: [[3, "amarillo"], [0, "rojo"]],
   prob: [[70, "amarillo"]],
-  rayos: [[1, "amarillo"], [20, "naranja"]],
+  rayo_km: [[50, "amarillo"], [20, "naranja"], [10, "rojo"]],
   focos: [[1, "naranja"]],
   cape: [[800, "amarillo"], [2500, "naranja"], [4000, "rojo"]],
   fwi: [[15, "amarillo"], [28, "naranja"], [46, "rojo"]],
@@ -1490,7 +1493,7 @@ var ESCALA_PATAGONIA = {
   rafaga: [[80, "amarillo"], [110, "naranja"], [140, "rojo"]],
   viento: [[65, "amarillo"], [90, "naranja"], [110, "rojo"]]
 };
-var NOMBRE_ESCALA = { rafaga: "Ráfaga, SMN", viento: "Viento sostenido, SMN", lluvia: "Lluvia, SMN", calor: "Temperatura alta", frio: "Helada", prob: "Probabilidad de lluvia", rayos: "Rayos a 20 km", focos: "Focos de calor", cape: "CAPE en J/kg", fwi: "FWI, escala de Córdoba", uv: "Índice UV, OMS", aire: "Índice de aire, EPA" };
+var NOMBRE_ESCALA = { rafaga: "Ráfaga, SMN", viento: "Viento sostenido, SMN", lluvia: "Lluvia, SMN", calor: "Temperatura alta", frio: "Helada", prob: "Probabilidad de lluvia", rayo_km: "Rayo más cercano, km", focos: "Focos de calor", cape: "CAPE en J/kg", fwi: "FWI, escala de Córdoba", uv: "Índice UV, OMS", aire: "Índice de aire, EPA" };
 var COL = { ohmc: "var(--f-ohmc)", weatherapi: "var(--f-weatherapi)", openmeteo: "var(--f-openmeteo)",
   smn: "var(--f-smn)", fwi: "var(--f-fwi)", goes: "var(--f-goes)", calculado: "var(--f-calculado)" };
 var HORA = 3600000, DIA = 24 * HORA, MINIMO_VISTA = 3 * HORA;
