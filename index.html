@@ -613,10 +613,10 @@ function tiraDatos() {
   // intensa, 60 o más lluvia muy intensa y granizo. No asegura ver el pueblo: la sierra puede tapar.
   var rd = UI.loc ? null : L.radar;
   if (rd) {
-    var rc = rd.cercano ? rd.radares[rd.cercano] : null, claveRadar = clave("Viene de", "radar del OHMC (WebMet), guardado cada 10 min", "Ojo", "el haz pasa alto y la sierra puede tapar: no asegura ver el pueblo", "Hora", rd.hora);
+    var rc = rd.cercano ? rd.radares[rd.cercano] : null, claveRadar = clave("Viene de", "radar del OHMC (WebMet), cada 10 min, leído desde " + (rd.desde || ""), "Ojo", "el haz pasa alto y la sierra puede tapar: no asegura ver el pueblo", "Hora", rd.hora);
     poner("Riesgos", "rayo", rc ? marcado("rayo_km", rc.nucleo_km, Math.round(rc.nucleo_km) + " km") : "Ninguno", "Radar: núcleo de tormenta",
       rc ? marcado("dbz", rc.nucleo_dbz, rc.nucleo_dbz + " dBZ") : "A 40 km o menos", claveRadar);
-    if (rc) { var ult = renglonesUltimo(); if (ult) ult.lastChild.previousSibling.appendChild(document.createTextNode(", " + rd.cercano + (rc.tendencia ? " · " + rc.tendencia : ""))); }
+    if (rc) { var ult = renglonesUltimo(); if (ult) ult.lastChild.previousSibling.appendChild(document.createTextNode((rc.rumbo ? ", al " + rc.rumbo : "") + ", " + rd.cercano + (rc.tendencia ? " · " + rc.tendencia : ""))); }
     if (hay(rd.max_5km)) poner("Riesgos", "lluvia", marcado("dbz", rd.max_5km, rd.max_5km + " dBZ"), "Radar a 5 km del pueblo", rd.max_5km >= 60 ? "Lluvia muy intensa y granizo" : rd.max_5km >= 40 ? "Lluvia intensa" : "Débil o nada", claveRadar);
   }
   poner("Riesgos", "suelo", hay(suelo) ? fmt(Math.round(suelo * 10) / 10) + "°" : null, "Mínima del suelo");
