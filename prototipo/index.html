@@ -493,6 +493,47 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 .chispa-pie { font-size: 12px; color: var(--tinta3); text-align: right; margin-top: 1px; }
 
 .bloque-junto { grid-column: span 2; }
+
+.ah-cab { display: flex; align-items: center; gap: 4px 16px; flex-wrap: wrap; }
+.ah-cab .temp-grande { line-height: .92; letter-spacing: -.02em; }
+.ah-lado { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1 1 150px; }
+.ah-cielo { display: flex; align-items: center; gap: 6px; font-size: 17px; font-weight: 600; }
+.ah-cielo svg { color: var(--acento); flex: none; }
+.ah-quien { font-size: 13px; color: var(--tinta2); line-height: 1.35; }
+.ah-quien b { color: var(--tinta); font-weight: 600; }
+.ah-difer { margin: 8px 0 0; font-size: 13.5px; color: var(--tinta2); }
+.ah-frases { margin-top: 14px; display: grid; gap: 6px; }
+.ah-frases p, .ah-frase-sola { margin: 0; display: flex; gap: 8px; align-items: flex-start; font-size: 17px; line-height: 1.35; }
+.ah-frase-sola { font-size: 16px; margin-top: 10px; }
+.ah-ico { color: var(--acento); flex: none; margin-top: 2px; }
+.ah-frases b, .ah-frase-sola b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.curva-dia { margin: 14px -6px 0; min-height: 200px; }
+.curva-dia svg { display: block; width: 100%; height: auto; }
+.curva-ley { display: flex; flex-wrap: wrap; gap: 2px 14px; padding: 2px 6px 0; font-size: 12.5px; color: var(--tinta3); }
+.curva-ley span::before { content: ""; display: inline-block; width: 16px; height: 0; vertical-align: middle; margin-right: 5px; }
+.ley-pas::before { border-top: 2px dashed var(--tinta3); }
+.ley-med::before { width: 9px !important; height: 9px !important; border-radius: 50%; background: var(--acento); }
+.ley-vie::before { border-top: 2.5px solid var(--tinta); }
+.ley-llu::before { width: 8px !important; height: 10px !important; border-radius: 1.5px; background: var(--pron); opacity: .6; }
+.ah-datos { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--trazo); font-size: 14px; color: var(--tinta2); }
+.ah-datos b { color: var(--tinta); font-weight: 600; font-variant-numeric: tabular-nums; }
+.ah-datos .nota-mod { flex-basis: 100%; font-size: 13px; color: var(--tinta3); }
+.ah-pie { margin-top: 8px; }
+.horas { display: flex; gap: 6px; overflow-x: auto; scroll-snap-type: x proximity; margin: 14px -16px 0; padding: 0 16px 6px; scrollbar-width: none; overscroll-behavior-x: contain; }
+.horas::-webkit-scrollbar { display: none; }
+.hora { flex: 0 0 58px; scroll-snap-align: start; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 0 8px; border-radius: 12px; background: var(--hoja2); }
+.hora svg { color: var(--acento); }
+.hora.ahora-h { background: transparent; box-shadow: inset 0 0 0 1.5px var(--acento); }
+.hora.hora-dia { box-shadow: inset 2px 0 0 var(--trazo); }
+.hora-h { font-size: 13px; color: var(--tinta2); white-space: nowrap; }
+.hora-dia .hora-h { color: var(--tinta); font-weight: 600; }
+.hora-t { font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.hora-p { font-size: 13px; color: var(--tinta2); min-height: 34px; text-align: center; line-height: 1.25; }
+.hora-p small { display: block; font-size: 12px; color: var(--tinta3); }
+.franja-pulida { margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: var(--hoja2); }
+.fp-tit { margin: 0; font-size: 15px; font-weight: 600; }
+.dos-temps { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; margin-top: 6px; }
+.dos-temps .temp-hoy { font-size: 28px; }
 @media (max-width: 1040px) { .bloque-junto { grid-column: auto; } }
 .franja-hoy { margin: 10px -6px 0; padding: 10px 12px; border-radius: 8px; background: var(--hoja2); border-left: 4px solid var(--pron); }
 .franja-hoy .boletin-cab { margin-bottom: 2px; }
@@ -591,10 +632,14 @@ function el(tag, attrs, hijos) {
     else if (k === "value" || k === "checked" || k === "disabled") e[k] = attrs[k];
     else e.setAttribute(k, attrs[k] === true ? "" : attrs[k]);
   }
-  ([].concat(hijos === undefined ? [] : hijos)).forEach(function (h) {
-    if (h === null || h === undefined || h === false) return;
-    e.appendChild(typeof h === "object" ? h : document.createTextNode(String(h)));
-  });
+  // Las listas se aplanan a cualquier profundidad: las frases se arman con partes condicionales anidadas.
+  (function poner(hs) {
+    ([].concat(hs === undefined ? [] : hs)).forEach(function (h) {
+      if (h === null || h === undefined || h === false) return;
+      if (Array.isArray(h)) { poner(h); return; }
+      e.appendChild(typeof h === "object" ? h : document.createTextNode(String(h)));
+    });
+  })(hijos);
   return e;
 }
 function $(id) { return document.getElementById(id); }
@@ -1648,12 +1693,14 @@ function contenidoHoy(x, op) {
   if (x.prob !== null) ind.push(indicadorProbabilidad(x.prob, x.noche ? null : x.hora, x.hora === null ? 99 : x.hora - x.hh));
   // Solo lo que falta. El total del día del modelo le restaba fuerza y se leía como algo que no pasó (usuario, 3/11).
   if (x.t.length) ind.push(indicador("lluvia", marcado("lluvia", x.mm, mm1(x.mm) + " más"), x.noche ? "hasta las 6" : "en lo que queda"));
-  if (x.rafaga !== null) ind.push(indicador("viento", marcado("rafaga", x.rafaga, Math.round(x.rafaga) + " km/h"), "Ráfaga hasta"));
+  if (x.rafaga !== null) ind.push(indicador("viento", marcado("rafaga", x.rafaga, Math.round(x.rafaga) + " km/h"), "Ráfagas hasta"));
   nodos.push(el("div", { "class": "indicadores" }, ind));
   return nodos;
 }
 function botonFranjas() {
-  return el("button", { "class": "enlace", id: "b-franjas", "aria-controls": "panel-franjas", "aria-expanded": UI.franjas ? "true" : "false" }, textoFranjas());
+  // Con acción propia: en C, D y E no hay un bloque que tome el clic. stopPropagation evita que A lo alterne dos veces.
+  return el("button", { "class": "enlace", id: "b-franjas", "aria-controls": "panel-franjas", "aria-expanded": UI.franjas ? "true" : "false",
+    onclick: function (e) { e.stopPropagation(); alternarFranjas(); } }, textoFranjas());
 }
 function franjaHoy(op) {
   op = op || {};
@@ -1666,13 +1713,17 @@ function franjaHoy(op) {
   return f;
 }
 function varianteActual() {
-  if (!UI.variante) { try { UI.variante = localStorage.getItem("clima-variante") === "B" ? "B" : "A"; } catch (e) { UI.variante = "A"; } }
+  if (!UI.variante) {
+    var g = null;
+    try { g = localStorage.getItem("clima-variante"); } catch (e) { /* sin guardar */ }
+    UI.variante = VARIANTES.some(function (x) { return x[0] === g; }) ? g : "C";
+  }
   return UI.variante;
 }
 function selectorVariante() {
   var actual = varianteActual();
-  return el("div", { "class": "variante" }, ["Prototipo · Ahora y Hoy:", el("div", { "class": "segmentos", role: "group", "aria-label": "Variante" },
-    [["A", "A · un bloque"], ["B", "B · separados"]].map(function (x) {
+  return el("div", { "class": "variante" }, ["Prototipo:", el("div", { "class": "segmentos", role: "group", "aria-label": "Variante" },
+    VARIANTES.map(function (x) {
       return el("button", { "aria-pressed": String(actual === x[0]), onclick: function () {
         UI.variante = x[0];
         try { localStorage.setItem("clima-variante", x[0]); } catch (e) { /* solo es comodidad */ }
@@ -1719,7 +1770,7 @@ function tableroDias(v, ahora, viene) {
     if (tableroDias.mira.addEventListener) tableroDias.mira.addEventListener("change", rearmar); else tableroDias.mira.addListener(rearmar);
   }
   if (A) { var s = ahora(); s.classList.add("bloque-junto"); s.appendChild(franjaHoy({ sinBoton: movil })); ahoraHoy = [s]; }
-  else ahoraHoy = [ahora(), bloqueHoy({ complemento: movil, sinBoton: movil })];
+  else ahoraHoy = [bloqueVariante(varianteActual(), movil)];
   v.appendChild(selectorVariante());
   if (movil) {
     v.appendChild(pestanas([
@@ -1729,6 +1780,203 @@ function tableroDias(v, ahora, viene) {
   } else {
     v.appendChild(el("div", { "class": "hoy-grid" }, [bloqueAyer()].concat(ahoraHoy, [viene, panelFranjas()])));
   }
+}
+function datosAhora() {
+  var med = medicion(), V = vivoV(), a = V.actual || {}, hoy = String(V.capturado).slice(0, 10);
+  if (!UI.loc) {
+    var d = L.datos || {}, dir = String(d.viento_dir || "").toLowerCase();
+    return { temp: d.temp, med: med, cielo: CIELO[d.nube_clase] || d.cond_txt || "", icono: iconoCielo(d.nube_clase, d.estado), hum: d.hum, viento: d.viento,
+      dir: dir ? "del " + dir : "", rafaga: d.rafaga, presion: d.presion, llovio: d.precip_dia,
+      lloviendo: /lluv|llov/.test(String(d.estado)) && d.estado !== "sin_lluvia", modelo: a.temp_c, vientoMedido: med.medido };
+  }
+  var llovio = ((V.horas || {}).lluvia || []).filter(function (p) { return p[0].slice(0, 10) === hoy && p[0] <= String(V.capturado); }).reduce(function (x, p) { return x + p[1]; }, 0);
+  var clase = hay(a.cloud) ? claseCielo(a.cloud) : "", llueve = /lluv|llovizna|chapar|torment/i.test(a.condicion || "") || a.precip_mm >= 0.2;
+  return { temp: med.medido && hay(med.temp) ? med.temp : a.temp_c, med: med, cielo: a.condicion || "", icono: iconoCielo(clase, llueve ? "lluvia" : ""), hum: a.humidity,
+    viento: med.medido && hay(med.viento) ? med.viento : a.wind_kph, vientoMedido: med.medido && hay(med.viento), dir: a.wind_dir ? "del " + a.wind_dir : "",
+    rafaga: a.gust_kph, presion: a.pressure_mb, llovio: med.medido && hay(med.lluvia_dia) ? med.lluvia_dia : llovio, lloviendo: llueve, modelo: a.temp_c };
+}
+function dosHoras(t) { var d = new Date(t); return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); }
+function horasQueVienen() {
+  var V = vivoV(), h = V.horas || {}, ahora = new Date(V.capturado), fin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() + 1, 6).getTime();
+  var T = porHora(serieTemp(h)), P = porHora(h.prob), M = porHora(h.lluvia), N = porHora(h.nube), wa = {}, out = [];
+  (V.wa_horas || []).forEach(function (f) { wa[String(f[0]).slice(0, 13).replace("T", " ")] = f; });
+  for (var t = (Math.floor(ahora.getTime() / HORA) + 1) * HORA; t <= fin; t += HORA) {
+    var d = new Date(t), k = fechaDe(d) + " " + ("0" + d.getHours()).slice(-2), w = wa[k];
+    if (!hay(T[k])) continue;
+    out.push({ t: t, h: d.getHours(), temp: T[k], prob: w && hay(w[3]) ? w[3] : P[k], mm: (w && hay(w[4]) ? w[4] : M[k]) || 0, nube: N[k], hoy: fechaDe(d) === fechaDe(ahora) });
+  }
+  return out;
+}
+function iconoHora(x) {
+  if (x.prob >= 50 && x.mm >= 0.3) return "lluvia";
+  var c = hay(x.nube) ? claseCielo(x.nube) : "parcial";
+  return c === "despejado" || c === "algo" ? (x.h >= 7 && x.h < 20 ? "sol" : "luna") : "nube";
+}
+function negrita(t) { return el("b", { text: t }); }
+function fraseLluvia(A, horas) {
+  var noche = new Date(vivoV().capturado).getHours() >= 18, tramo = horas.filter(function (x) { return noche || x.hoy; });
+  if (!tramo.length) return null;
+  var pico = tramo.reduce(function (a, b) { return (b.prob || 0) > (a.prob || 0) ? b : a; }), mm = tramo.reduce(function (s, x) { return s + x.mm; }, 0);
+  var cuanto = mm < 0.1 ? "" : mm < 1 ? "poca: " + mm1(mm) : mm < 10 ? "unos " + mm1(mm) : mm1(mm);
+  if (A.lloviendo) {
+    var sigue = tramo.filter(function (x) { return x.prob >= 50; }).pop();
+    return ["Llueve ahora", sigue ? [". Sigue hasta las ", negrita(sigue.h + " h"), " más o menos"] : ". Según el modelo, para pronto", cuanto ? [", ", marcado("lluvia", mm, cuanto), " más"] : "", "."];
+  }
+  var p = pico.prob || 0, cuando = noche ? "esta noche" : "hoy";
+  if (p < 20) return ["Sin lluvia a la vista " + cuando + "."];
+  var verbo = p >= 70 ? "Es probable que llueva" : p >= 40 ? "Puede llover" : "Poca chance de lluvia";
+  return [verbo, " cerca de las ", negrita(pico.h + " h"), " (", marcado("prob", p, p + " %"), ")", cuanto ? [", ", marcado("lluvia", mm, cuanto)] : "", "."];
+}
+function minNoche(horas) { return horas.filter(function (x) { return !x.hoy || x.h >= 18; }).reduce(function (a, b) { return !a || b.temp < a.temp ? b : a; }, null); }
+function fraseTemp(A, horas) {
+  if (!horas.length) return null;
+  var hh = new Date(vivoV().capturado).getHours(), out = [], hoy = horas.filter(function (x) { return x.hoy; });
+  var max = hoy.length ? hoy.reduce(function (a, b) { return b.temp > a.temp ? b : a; }) : null, min = minNoche(horas);
+  if (hh < 15 && max && (!hay(A.temp) || max.temp > A.temp + 0.5)) out.push("Sube hasta ", marcaTemp(max.temp, Math.round(max.temp) + "°"), " cerca de las ", negrita(max.h + " h"), ". ");
+  if (min) out.push(min.h < 7 ? "De madrugada baja a " : "A la noche baja a ", marcaTemp(min.temp, Math.round(min.temp) + "°"), " (" + min.h + " h).");
+  return out.length ? out : null;
+}
+function lineaDiferencia(A) {
+  if (!A.med.medido || !hay(A.temp) || !hay(A.modelo)) return null;
+  var d = Math.round(A.temp - A.modelo);
+  if (Math.abs(d) < 3) return null;
+  return el("p", { "class": "ah-difer", text: "El modelo calcula " + Math.round(A.modelo) + "° para ahora: la estación marca " + Math.abs(d) + "° " + (d > 0 ? "más" : "menos") + "." });
+}
+function cabeceraAhora(A) {
+  var quien = A.med.medido ? ["Medido a las ", negrita(dosHoras(A.med.hora)), " en ", negrita(A.med.fuente), hay(A.med.km) ? ", a " + Math.round(A.med.km) + " km" : ""]
+    : ["Sin estación cerca: ", negrita("estimado por el modelo")];
+  return el("div", { "class": "ah-cab" }, [
+    el("div", { "class": "temp-grande din" }, hay(A.temp) ? marcaTemp(A.temp, Math.round(A.temp) + "°") : "—"),
+    el("div", { "class": "ah-lado" }, [A.cielo ? el("div", { "class": "ah-cielo" }, [icono(A.icono, 22), A.cielo]) : null, el("div", { "class": "ah-quien" }, quien)])]);
+}
+function frasesDia(A, horas) {
+  var l = fraseLluvia(A, horas), t = fraseTemp(A, horas);
+  return el("div", { "class": "ah-frases" }, [l ? el("p", {}, [el("span", { "class": "ah-ico" }, icono("paraguas", 18)), el("span", {}, l)]) : null,
+    t ? el("p", {}, [el("span", { "class": "ah-ico" }, icono("termo", 18)), el("span", {}, t)]) : null]);
+}
+function datosEnLinea(A, x) {
+  var it = [];
+  if (hay(A.hum)) it.push([negrita(fmt(A.hum) + " %"), " humedad"]);
+  if (hay(A.viento)) it.push(["viento ", negrita(Math.round(A.viento) + " km/h"), A.dir ? " " + A.dir : "", A.rafaga >= 30 ? [", ráfagas ", marcado("rafaga", A.rafaga, String(Math.round(A.rafaga)))] : ""]);
+  if (x && x.rafaga !== null && x.rafaga >= 30) it.push(["ráfagas hasta ", marcado("rafaga", x.rafaga, Math.round(x.rafaga) + " km/h"), " en lo que queda"]);
+  if (hay(A.presion)) it.push([negrita(fmt(A.presion) + " hPa"), " s.n.m."]);
+  if (hay(A.llovio)) it.push(["llovió hoy ", negrita(mm1(A.llovio)), A.med.medido && hay(A.med.lluvia_dia) ? el("span", { "class": "ind-medido", text: " medido" }) : " (estimado)"]);
+  var nodos = it.map(function (z) { return el("span", {}, z); });
+  if (A.med.medido) nodos.push(el("span", { "class": "nota-mod", text: "Humedad, " + (A.vientoMedido ? "ráfagas" : "viento") + " y presión: del modelo." }));
+  return el("div", { "class": "ah-datos" }, nodos);
+}
+function curvaDia(A, horas) {
+  var caja = el("div", { "class": "curva-dia", role: "img", "aria-label": "Temperatura de las últimas horas y hasta las 6 de mañana, con la probabilidad de lluvia por hora" });
+  function dibujar() {
+    if (!caja.isConnected || !caja.clientWidth) return;
+    vaciar(caja);
+    var V = vivoV(), ahora = new Date(V.capturado).getTime(), t0 = ahora - 9 * HORA, t1 = horas.length ? horas[horas.length - 1].t : ahora + 12 * HORA;
+    var pasado = serieTemp(V.horas || {}).map(function (z) { return { t: new Date(z[0]).getTime(), v: z[1] }; }).filter(function (z) { return z.t >= t0 && z.t <= ahora; });
+    var W = Math.max(280, caja.clientWidth), Hh = 180, m = { l: 10, r: 12, t: 26, b: 60 }, banda = 26, base = Hh - 24;
+    var vs = pasado.map(function (z) { return z.v; }).concat(horas.map(function (z) { return z.temp; })).concat(hay(A.temp) ? [A.temp] : []);
+    if (!vs.length) return;
+    var mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs);
+    if (mx - mn < 4) { mx += 2; mn -= 2; }
+    function X(t) { return m.l + (W - m.l - m.r) * (t - t0) / (t1 - t0); }
+    function Y(v) { return m.t + (Hh - m.t - m.b) * (1 - (v - mn) / (mx - mn)); }
+    var s = svg("svg", { viewBox: "0 0 " + W + " " + Hh, "aria-hidden": "true" }), xa = X(ahora);
+    // Probabilidad de lluvia por hora, abajo: amarillo desde 70 %.
+    var ancho = Math.max(3, (W - m.l - m.r) * HORA / (t1 - t0) - 2);
+    horas.forEach(function (z) {
+      if (!(z.prob >= 10)) return;
+      var alto = banda * z.prob / 100;
+      s.appendChild(svg("rect", { x: X(z.t) - ancho / 2, y: base - alto, width: ancho, height: alto, rx: 1.5, fill: z.prob >= 70 ? "var(--n-amarillo)" : "var(--pron)", "fill-opacity": z.prob >= 70 ? 0.9 : 0.5 }));
+    });
+    var pico = horas.reduce(function (a, b) { return !a || (b.prob || 0) > (a.prob || 0) ? b : a; }, null);
+    if (pico && pico.prob >= 30) {
+      var tp = svg("text", { x: X(pico.t), y: base - banda - 5, "text-anchor": "middle", "font-size": 12, "font-weight": 700, fill: pico.prob >= 70 ? "var(--n-amarillo)" : "var(--tinta2)" });
+      tp.textContent = pico.prob + " %"; s.appendChild(tp);
+    }
+    s.appendChild(svg("line", { x1: m.l, x2: W - m.r, y1: base, y2: base, stroke: "var(--trazo)" }));
+    for (var q = Math.ceil(t0 / HORA) * HORA; q <= t1; q += HORA) {
+      var hr = new Date(q).getHours();
+      if (hr % 3 || Math.abs(X(q) - xa) < 38 || X(q) < 14 || X(q) > W - 14) continue;
+      var tx = svg("text", { x: X(q), y: Hh - 7, "text-anchor": "middle", "font-size": 12, fill: "var(--tinta3)" });
+      tx.textContent = hr + " h"; s.appendChild(tx);
+    }
+    var ta = svg("text", { x: xa, y: Hh - 7, "text-anchor": "middle", "font-size": 12, "font-weight": 700, fill: "var(--acento)" });
+    ta.textContent = "ahora"; s.appendChild(ta);
+    s.appendChild(svg("line", { x1: xa, x2: xa, y1: m.t - 10, y2: base, stroke: "var(--trazo)", "stroke-dasharray": "2 3" }));
+    // Lo pasado, del modelo: punteado. Lo que viene: línea llena desde el valor de ahora.
+    var dp = pasado.map(function (z, i) { return (i ? "L" : "M") + X(z.t).toFixed(1) + " " + Y(z.v).toFixed(1); }).join("");
+    if (dp) s.appendChild(svg("path", { d: dp, fill: "none", stroke: "var(--tinta3)", "stroke-width": 2, "stroke-dasharray": "4 4", "stroke-linecap": "round" }));
+    // La línea del modelo sigue del valor del modelo, no del medido: si no, una estación que da 8° más
+    // dibujaba una caída de 8° en una hora. Lo medido va aparte, como punto.
+    var arranque = pasado.length ? pasado[pasado.length - 1].v : hay(A.modelo) ? A.modelo : null;
+    var df =(arranque !== null ? "M" + xa.toFixed(1) + " " + Y(arranque).toFixed(1) : "") + horas.map(function (z, i) { return (i || arranque !== null ? "L" : "M") + X(z.t).toFixed(1) + " " + Y(z.temp).toFixed(1); }).join("");
+    s.appendChild(svg("path", { d: df, fill: "none", stroke: "var(--tinta)", "stroke-width": 2.5, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    function rotulo(t, v, txt, arriba) {
+      var x0 = X(t), ancla = x0 > W - 60 ? "end" : x0 < 60 ? "start" : "middle";
+      s.appendChild(svg("circle", { cx: x0, cy: Y(v), r: 3.5, fill: "var(--tinta)" }));
+      var e = svg("text", { x: x0, y: Y(v) + (arriba ? -10 : 20), "text-anchor": ancla, "font-size": 13, "font-weight": 700, fill: "var(--tinta)" });
+      e.textContent = txt; s.appendChild(e);
+    }
+    if (horas.length) {
+      var mnF = minNoche(horas) || horas.reduce(function (a, b) { return b.temp < a.temp ? b : a; }), mxF = horas.reduce(function (a, b) { return b.temp > a.temp ? b : a; });
+      if (!hay(A.temp) || mxF.temp > A.temp + 0.5) rotulo(mxF.t, mxF.temp, Math.round(mxF.temp) + "° a las " + mxF.h, true);
+      rotulo(mnF.t, mnF.temp, Math.round(mnF.temp) + "° a las " + mnF.h, false);
+    }
+    var ahoraV = hay(A.temp) ? A.temp : arranque;
+    if (ahoraV !== null) {
+      s.appendChild(svg("circle", { cx: xa, cy: Y(ahoraV), r: 6, fill: A.med.medido ? "var(--acento)" : "var(--hoja)", stroke: A.med.medido ? "var(--hoja)" : "var(--tinta)", "stroke-width": 2 }));
+      var tn = svg("text", { x: xa - 10, y: Y(ahoraV) - 10, "text-anchor": "end", "font-size": 13, "font-weight": 700, fill: A.med.medido ? "var(--acento)" : "var(--tinta)" });
+      tn.textContent = Math.round(ahoraV) + "°" + (A.med.medido ? " medido" : ""); s.appendChild(tn);
+    }
+    caja.appendChild(s);
+    caja.appendChild(el("div", { "class": "curva-ley" }, [el("span", { "class": "ley-pas", text: "pasó, modelo" }), el("span", { "class": "ley-med", text: A.med.medido ? "medido ahora" : "ahora, modelo" }),
+      el("span", { "class": "ley-vie", text: "lo que viene" }), el("span", { "class": "ley-llu", text: "prob. de lluvia" })]));
+  }
+  setTimeout(dibujar, 0);
+  if (!curvaDia.vivas) {
+    curvaDia.vivas = [];
+    var espera = null;
+    window.addEventListener("resize", function () { clearTimeout(espera); espera = setTimeout(function () { curvaDia.vivas.forEach(function (f) { f(); }); }, 150); });
+  }
+  curvaDia.vivas = curvaDia.vivas.filter(function (f) { return f.caja.isConnected; });
+  dibujar.caja = caja; curvaDia.vivas.push(dibujar);
+  return caja;
+}
+function tiraHoras(A, horas) {
+  var tira = el("div", { "class": "horas", role: "list", "aria-label": "Por hora, hasta las 6 de mañana" });
+  tira.appendChild(el("div", { "class": "hora ahora-h", role: "listitem" }, [el("div", { "class": "hora-h", text: "Ahora" }), icono(A.icono, 22),
+    el("div", { "class": "hora-t din" }, hay(A.temp) ? marcaTemp(A.temp, Math.round(A.temp) + "°") : "—"), el("div", { "class": "hora-p" }, A.med.medido ? el("span", { "class": "ind-medido", text: "medido" }) : "")]));
+  horas.forEach(function (z) {
+    tira.appendChild(el("div", { "class": "hora" + (z.h === 0 ? " hora-dia" : ""), role: "listitem" }, [
+      el("div", { "class": "hora-h", text: z.h === 0 ? etiquetaDia({ fecha: fechaDe(new Date(z.t)), desfase: 1 }) : z.h + " h" }), icono(iconoHora(z), 22),
+      el("div", { "class": "hora-t din" }, marcaTemp(z.temp, Math.round(z.temp) + "°")),
+      el("div", { "class": "hora-p" }, z.prob >= 20 ? [marcado("prob", z.prob, z.prob + " %"), z.mm >= 0.1 ? el("small", { text: fmt(Math.round(z.mm * 10) / 10) + " mm" }) : ""] : "")]));
+  });
+  return tira;
+}
+function cuerpoPulido(A, horas) {
+  var x = datosHoy();
+  if (!x || !x.dia.length) return [el("p", { "class": "nota", text: "Sin pronóstico por hora." })];
+  var c = cifraHoy(x), minN = minNoche(horas), maxT = c.tarde ? c.otra : c.valor, nodos = [];
+  var notaMax = c.tarde ? (hay(A.temp) && Math.round(maxT) === Math.round(A.temp) ? "la de ahora" : "ya pasó") : (c.nota || "más tarde");
+  nodos.push(el("div", { "class": "dos-temps" }, [
+    el("div", {}, [el("div", { "class": "temp-hoy din" }, ["Máx. ", marcado("calor", maxT, Math.round(maxT) + "°")]), el("div", { "class": "ind-eti", text: notaMax })]),
+    minN ? el("div", {}, [el("div", { "class": "temp-hoy din" }, ["Mín. ", marcaTemp(minN.temp, Math.round(minN.temp) + "°")]), el("div", { "class": "ind-eti", text: "a las " + minN.h + " h" })]) : null]));
+  var l = fraseLluvia(A, horas);
+  if (l) nodos.push(el("p", { "class": "ah-frase-sola" }, [el("span", { "class": "ah-ico" }, icono("paraguas", 18)), el("span", {}, l)]));
+  if (x.rafaga !== null) nodos.push(el("p", { "class": "ind-eti", style: "margin:4px 0 0" }, ["Ráfagas hasta ", marcado("rafaga", x.rafaga, Math.round(x.rafaga) + " km/h")]));
+  return nodos;
+}
+function bloqueVariante(v, movil) {
+  var A = datosAhora(), horas = horasQueVienen(), x = datosHoy();
+  var sec = el("section", { "class": "hoja bloque bloque-ahora bloque-junto v-" + v, "aria-label": "Ahora y lo que queda del día" }, [cabeceraAhora(A), lineaDiferencia(A)]);
+  if (v === "C") { sec.appendChild(frasesDia(A, horas)); sec.appendChild(curvaDia(A, horas)); sec.appendChild(datosEnLinea(A, x)); }
+  else if (v === "D") { sec.appendChild(frasesDia(A, horas)); sec.appendChild(tiraHoras(A, horas)); sec.appendChild(datosEnLinea(A, x)); }
+  else {
+    sec.appendChild(datosEnLinea(A, null));
+    sec.appendChild(el("div", { "class": "franja-pulida" }, [el("div", { "class": "boletin-cab" }, [el("h3", { "class": "fp-tit din", text: x && x.noche ? "Hasta mañana a las 6" : "Lo que queda del día" }), movil ? null : botonFranjas()])].concat(cuerpoPulido(A, horas))));
+  }
+  if (!movil && v !== "E") sec.appendChild(el("div", { "class": "ah-pie" }, botonFranjas()));
+  return sec;
 }
 var ICONOS = {
   humedad: ["M12 3.5s6.5 7 6.5 11.5a6.5 6.5 0 0 1-13 0C5.5 10.5 12 3.5 12 3.5z"],
@@ -1784,6 +2032,8 @@ var PALABRAS = { sin_lluvia: "Sin lluvia", lluvia: "Lluvia", llovizna: "Llovizna
 var _estaciones = null;
 var renglonesUltimo = function () { return null; };
 var MOVIL = "(max-width: 720px)";
+var VARIANTES = [["A", "A actual"], ["C", "C curva"], ["D", "D horas"], ["E", "E pulida"]];
+var RUMBOS = { norte: 0, nordeste: 45, noreste: 45, este: 90, sudeste: 135, sureste: 135, sur: 180, sudoeste: 225, suroeste: 225, oeste: 270, noroeste: 315 };
 
 var LUGAR_INICIAL = { nombre: "La Población, Córdoba", lat: -32.0667, lon: -65.0333 };
 var ACTUALIZAR_MIN = 15;
@@ -1891,7 +2141,8 @@ function cargar(lugar) {
   return Promise.all([pedir(pron), pedir(aire).catch(function () { return null; }), estacionCerca(lugar)]).then(function (r) {
     UI.loc = lugar.nombre; UI.locVivo = aVivo(r[0], r[1]); UI.estacion = r[2]; capturadoEn = Date.now(); aLectura(UI.locVivo);
     try { localStorage.setItem("clima-lugar", JSON.stringify(lugar)); } catch (e) { /* solo es comodidad */ }
-    pintar(); pintarLeido();
+    // Un error al dibujar no es falta de conexión: se dice distinto y queda en la consola.
+    try { pintar(); pintarLeido(); } catch (e) { console.error(e); $("m-leido").textContent = "Error al mostrar los datos"; $("b-actualizar").classList.remove("girando"); }
   }).catch(function () {
     $("b-actualizar").classList.remove("girando");
     if (UI.locVivo) { $("m-leido").textContent = "Sin conexión: datos anteriores"; return; }
