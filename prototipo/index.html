@@ -1090,6 +1090,12 @@ function datosHoy() {
   var dia = deHoy(serieTemp(h)).map(function (x) { return x[1]; }), t = resto(serieTemp(h)).map(function (x) { return x[1]; });
   var wr = resto(wa), probs = (wr.length ? wr.map(function (x) { return x[3]; }) : resto(h.prob).map(function (x) { return x[1]; })).filter(hay);
   var mms = (wr.length ? wr.map(function (x) { return x[4]; }) : resto(h.lluvia).map(function (x) { return x[1]; })).filter(hay);
+  // La hora va con la probabilidad que se muestra. Antes salía solo si esa hora traía 0,3 mm o más (regla del
+  // boletín): el 3/11 el 71 % era a las 17 con 0 mm y la hora no aparecía.
+  var horaProb = null, pMax = -1;
+  (wr.length ? wr.map(function (x) { return [x[0], x[3]]; }) : resto(h.prob)).forEach(function (x) {
+    if (hay(x[1]) && x[1] > pMax) { pMax = x[1]; horaProb = parseInt(String(x[0]).replace(" ", "T").slice(11, 13), 10); }
+  });
   var ra = resto(h.rafaga).map(function (x) { return x[1]; });
   // La lluvia en tres cosas que no se mezclan: lo que falta (mm), el total del día según el modelo (mmDia) y lo
   // que el modelo cree que ya llovió (mmPasado). El 3/11 "12 mm" del día se leyó como "faltan 12 mm".
@@ -1098,7 +1104,7 @@ function datosHoy() {
   var mmPasado = lluviaHoy.filter(function (x) { return hora_(x) <= desde; }).reduce(function (a, x) { return a + (x[1] || 0); }, 0);
   var pasado = deHoy(serieTemp(h)).filter(function (x) { return hora_(x) <= desde; }).map(function (x) { return x[1]; });
   return { hh: hh, noche: noche, dia: dia, t: t, prob: probs.length ? Math.max.apply(null, probs) : null, mm: mms.reduce(function (a, b) { return a + b; }, 0),
-    rafaga: ra.length ? Math.max.apply(null, ra) : null, hora: hay(V.hora_pico) ? V.hora_pico : null, mmDia: lluviaHoy.length ? mmDia : null, mmPasado: mmPasado, pasado: pasado };
+    rafaga: ra.length ? Math.max.apply(null, ra) : null, hora: horaProb, mmDia: lluviaHoy.length ? mmDia : null, mmPasado: mmPasado, pasado: pasado };
 }
 function bloqueHoy(op) {
   op = op || {};
@@ -1490,7 +1496,7 @@ function dibujarGrafico() {
         fila([el("b", { text: Math.round(c.v) + cfg.u }), " a las " + new Date(c.t).getHours() + " h"]);
       } else if (q && UI.serie === "temp") fila([el("b", { text: Math.round(q.max) + "° / " + Math.round(q.min) + "°" }), " máxima y mínima"]);
       else if (q && UI.serie === "viento") fila([el("b", { text: Math.round(q.rafaga) + " km/h" }), " ráfaga máxima"]);
-      else if (q && UI.serie === "lluvia" && q.fecha === fechaHoy && faltaHoy !== null) { fila([el("b", { text: mm1(faltaHoy) + " más" }), " hasta la medianoche"]); fila(mm1(totalHoy) + " en el día, según el modelo"); }
+      else if (q && UI.serie === "lluvia" && q.fecha === fechaHoy && faltaHoy !== null) { fila([el("b", { text: mm1(faltaHoy) + " más" }), " hasta la medianoche"]); }
       else if (q && UI.serie === "lluvia") fila([el("b", { text: mm1(q.mm) }), " en el día"]);
       else fila("Sin pronóstico para este dato");
     } else {
@@ -1511,7 +1517,7 @@ function dibujarGrafico() {
   cajita.addEventListener("pointerleave", function () { globo.style.display = "none"; mira.setAttribute("visibility", "hidden"); });
   cont.appendChild(cajita);
   var txt = [];
-  if (UI.serie === "lluvia" && faltaHoy !== null) txt.push("Hoy: " + mm1(faltaHoy) + " más hasta la medianoche, " + mm1(totalHoy) + " en el día según el modelo" + (puntoMed !== null ? ", " + mm1(puntoMed) + " medidos en " + med.fuente : "") + ".");
+  if (UI.serie === "lluvia" && faltaHoy !== null) txt.push("Hoy: " + mm1(faltaHoy) + " más hasta la medianoche" + (puntoMed !== null ? ", " + mm1(puntoMed) + " medidos en " + med.fuente : "") + ".");
   if (UI.serie === "lluvia") txt.push(C.notaLluvia ||"Milímetros acumulados en el día, no por hora: cada línea arranca en 0 a medianoche y sube a medida que llueve. WeatherAPI es lo que estimó su modelo, no lo medido. Las barras son el total pronosticado de cada día.");
   if (hayPron) txt.push(horas.length && L.vivo ? "Pronóstico por hora de Open-Meteo, consultado " + fmtHora(L.vivo.capturado) + "." : "Pronóstico por día, bajado " + fmtHora(P.capturado) + ".");
   if (hayHueco) txt.push(estimar ? "Gris punteado: recta entre el último dato y el siguiente. Es una estimación por datos faltantes, no una medición." : "Los cortes son horas sin dato.");
@@ -1640,8 +1646,8 @@ function contenidoHoy(x, op) {
     c.nota ? el("span", { "class": "ind-eti", text: c.nota }) : null]),
     el("div", { "class": "ind-eti" }, c.tarde ? ["Máxima del día ", marcado("calor", c.otra, Math.round(c.otra) + "°")] : ["Mínima del día ", marcado("frio", c.otra, Math.round(c.otra) + "°")])];
   if (x.prob !== null) ind.push(indicadorProbabilidad(x.prob, x.noche ? null : x.hora, x.hora === null ? 99 : x.hora - x.hh));
-  if (x.t.length) ind.push(indicador("lluvia", marcado("lluvia", x.mm, mm1(x.mm) + " más"), x.noche ? "hasta las 6" : "en lo que queda",
-    hay(x.mmDia) ? mm1(x.mmDia) + " en el día según el modelo" : ""));
+  // Solo lo que falta. El total del día del modelo le restaba fuerza y se leía como algo que no pasó (usuario, 3/11).
+  if (x.t.length) ind.push(indicador("lluvia", marcado("lluvia", x.mm, mm1(x.mm) + " más"), x.noche ? "hasta las 6" : "en lo que queda"));
   if (x.rafaga !== null) ind.push(indicador("viento", marcado("rafaga", x.rafaga, Math.round(x.rafaga) + " km/h"), "Ráfaga hasta"));
   nodos.push(el("div", { "class": "indicadores" }, ind));
   return nodos;
@@ -1656,7 +1662,7 @@ function franjaHoy(op) {
   var f = el("div", { "class": "franja-hoy", "aria-label": "Lo que queda del día" }, [el("div", { "class": "boletin-cab" }, cab)]);
   if (!x || !x.dia.length) { f.appendChild(el("p", { "class": "nota", text: "Sin pronóstico por hora." })); return f; }
   contenidoHoy(x, op).forEach(function (n) { f.appendChild(n); });
-  if (!op.sinBoton) { f.classList.add("bloque-clic"); f.addEventListener("click", function (e) { if (e.target.id !== "b-franjas") alternarFranjas(); }); }
+  if (!op.sinBoton) { f.classList.add("bloque-clic"); f.addEventListener("click", function () { var s = window.getSelection && window.getSelection(); if (!s || !String(s)) alternarFranjas(); }); }
   return f;
 }
 function varianteActual() {
