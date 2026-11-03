@@ -495,7 +495,8 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 <script>
 // Hermana del panel: el diseño y el dibujo salen de panel_ui.html, los arma panel.py --publico.
 // Acá solo está lo propio: pedirle a Open-Meteo, sin clave, desde el navegador de cada persona.
-var C = { fuenteAhora: "Open-Meteo", notaFranjas: "De día, la máxima; de noche, la mínima. Pronóstico de Open-Meteo: es un modelo, no una medición. Pasá el mouse por una celda para ver el detalle.",
+// Acá no hay mediciones: todo el gráfico es el modelo, también lo que ya pasó.
+var C = { tituloGrafico: "Lo que pasó y lo que viene, según el modelo", antesGrafico: "Ya pasó", fuenteAhora: "Open-Meteo", notaFranjas: "De día, la máxima; de noche, la mínima. Pronóstico de Open-Meteo: es un modelo, no una medición. Pasá el mouse por una celda para ver el detalle.",
   notaLluvia: "Milímetros acumulados en el día, no por hora: la línea arranca en 0 a medianoche. Es lo que estima el modelo, no lo medido. Las barras son el total pronosticado de cada día." };
 var L = { astro: {}, historial: { cols: [], filas: [] }, pronostico: null, vivo: null }, UI = { loc: "", locVivo: null, franjas: false, estacion: null, serie: "temp", estimar: true, vent: null, vista: "resumen" };
 var ESTATICO = false;
@@ -942,7 +943,7 @@ function pieFuentes() {
     UI.estacion ? " Estación: FUENTE: Portal de Información Hídrica de Córdoba, dato del " + new Date(UI.estacion.a.UltimaActualizacion).toLocaleString("es-AR", { hour12: false }) + "." : ""]);
 }
 function grafico(v) {
-  var cab = el("div", { "class": "graf-cab" }, [el("h3", { "class": "din", text: "Lo medido y lo que viene" })]);
+  var cab = el("div", { "class": "graf-cab" }, [el("h3", { "class": "din", text: C.tituloGrafico || "Lo medido y lo que viene" })]);
   var seg_ = el("div", { "class": "segmentos", role: "group", "aria-label": "Variable" });
   Object.keys(SERIES).forEach(function (k) {
     seg_.appendChild(el("button", { "aria-pressed": String(UI.serie === k), onclick: function () { UI.serie = k; pintarVista(); } }, SERIES[k].nombre));
@@ -1298,7 +1299,7 @@ function dibujarGrafico() {
   // La división: de acá para la izquierda se midió, de acá para la derecha es pronóstico.
   if (verAhora) {
     s.appendChild(svg("line", { x1: xa, x2: xa, y1: 4, y2: abajo, stroke: "var(--aire)", "stroke-width": 2 }));
-    [["Medido", xa - 6, 29, "end", "var(--tinta2)", 400], ["Pronóstico", xa + 6, 29, "start", "var(--tinta2)", 400],
+    [[C.antesGrafico || "Medido", xa - 6, 29, "end", "var(--tinta2)", 400], ["Pronóstico", xa + 6, 29, "start", "var(--tinta2)", 400],
       ["Ahora", xa, Hh - 6, "middle", "var(--aire)", 600]].forEach(function (e) {
       var t = svg("text", { x: e[1], y: e[2], "text-anchor": e[3], "font-size": 11, fill: e[4], "font-weight": e[5] });
       t.textContent = e[0]; s.appendChild(t);
