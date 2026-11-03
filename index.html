@@ -480,6 +480,7 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
   <div class="marca din"><b>Clima</b> <span id="m-lugar"></span></div>
   <span class="espacio"></span>
   <span class="eti" id="m-leido"></span>
+  <button class="boton" id="b-ubicacion" hidden>Mi ubicación</button>
   <button class="boton" id="b-lugar">Cambiar lugar</button>
   <button class="boton" id="b-actualizar">Actualizar</button>
 </header>
@@ -943,13 +944,16 @@ function datosHoy() {
   var V = vivoV(), h = V.horas || {};
   if (!V.capturado) return null;
   var ahora = new Date(V.capturado), hoy = fechaDe(ahora), hh = ahora.getHours(), wa = V.wa_horas || [];
+  // De noche "lo que queda de hoy" son pocas horas o ninguna: se mira hasta las 6 de mañana.
+  var noche = hh >= 18, desde = hoy + "T" + ("0" + hh).slice(-2), hasta = noche ? fechaDe(new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() + 1)) + "T06" : hoy + "T24";
+  function hora_(x) { return String(x[0]).replace(" ", "T").slice(0, 13); }
   function deHoy(s) { return (s || []).filter(function (x) { return String(x[0]).slice(0, 10) === hoy; }); }
-  function resto(s) { return deHoy(s).filter(function (x) { return parseInt(String(x[0]).slice(11, 13), 10) > hh; }); }
+  function resto(s) { return (s || []).filter(function (x) { var k = hora_(x); return k > desde && k < hasta; }); }
   var dia = deHoy(serieTemp(h)).map(function (x) { return x[1]; }), t = resto(serieTemp(h)).map(function (x) { return x[1]; });
   var wr = resto(wa), probs = (wr.length ? wr.map(function (x) { return x[3]; }) : resto(h.prob).map(function (x) { return x[1]; })).filter(hay);
   var mms = (wr.length ? wr.map(function (x) { return x[4]; }) : resto(h.lluvia).map(function (x) { return x[1]; })).filter(hay);
   var ra = resto(h.rafaga).map(function (x) { return x[1]; });
-  return { hh: hh, dia: dia, t: t, prob: probs.length ? Math.max.apply(null, probs) : null, mm: mms.reduce(function (a, b) { return a + b; }, 0),
+  return { hh: hh, noche: noche, dia: dia, t: t, prob: probs.length ? Math.max.apply(null, probs) : null, mm: mms.reduce(function (a, b) { return a + b; }, 0),
     rafaga: ra.length ? Math.max.apply(null, ra) : null, hora: hay(V.hora_pico) ? V.hora_pico : null };
 }
 function bloqueHoy() {
@@ -958,14 +962,14 @@ function bloqueHoy() {
   sec = el("section", { "class": "hoja bloque bloque-hoy bloque-clic", "aria-label": "Hoy", onclick: function () {
     var s = window.getSelection && window.getSelection();
     if (!s || !String(s)) alternarFranjas();
-  } }, [el("div", { "class": "boletin-cab" }, [el("p", { "class": "bloque-eti", style: "margin:0", text: "HOY" }), boton])]);
+  } }, [el("div", { "class": "boletin-cab" }, [el("p", { "class": "bloque-eti", style: "margin:0" }, ["HOY", el("span", { text: x && x.noche ? " · hasta mañana a las 6" : "" })]), boton])]);
   if (!x || !x.dia.length) { sec.appendChild(el("p", { "class": "nota", text: "Sin pronóstico por hora." })); return sec; }
   var maxD = Math.max.apply(null, x.dia), minD = Math.min.apply(null, x.dia), tarde = x.hh >= 15 || !x.t.length;
   var cifra = !x.t.length ? minD : tarde ? Math.min.apply(null, x.t) : Math.max.apply(null, x.t);
   sec.appendChild(el("div", { "class": "temp-hoy din" }, [tarde ? "Mín. " : "Máx. ", marcaTemp(cifra, Math.round(cifra) + "°")]));
   sec.appendChild(el("div", { "class": "ind-eti" }, tarde ? ["Máxima del día ", marcado("calor", maxD, Math.round(maxD) + "°")] : ["Mínima del día ", marcado("frio", minD, Math.round(minD) + "°")]));
   var ind = [];
-  if (x.prob !== null) ind.push(indicadorProbabilidad(x.prob, x.hora, x.hora === null ? 99 : x.hora - x.hh));
+  if (x.prob !== null) ind.push(indicadorProbabilidad(x.prob, x.noche ? null : x.hora, x.hora === null ? 99 : x.hora - x.hh));
   if (x.t.length) ind.push(indicador("lluvia", marcado("lluvia", x.mm, fmt(Math.round(x.mm * 10) / 10) + " mm"), "Se esperan"));
   if (x.rafaga !== null) ind.push(indicador("viento", marcado("rafaga", x.rafaga, Math.round(x.rafaga) + " km/h"), "Ráfaga hasta"));
   sec.appendChild(el("div", { "class": "indicadores" }, ind));
@@ -1603,11 +1607,17 @@ function lugarGuardado() {
   } catch (e) { /* sin guardar, se usa el inicial */ }
   return LUGAR_INICIAL;
 }
+// La ubicación se pide con un botón: el navegador pregunta una sola vez y la página no la guarda en ningún
+// servidor. Si ya se dio permiso antes, se usa sola al abrir. Necesita https: en http el botón no aparece.
+function ubicar(si, no) {
+  navigator.geolocation.getCurrentPosition(function (p) {
+    cargar({ nombre: "Mi ubicación", lat: Math.round(p.coords.latitude * 100) / 100, lon: Math.round(p.coords.longitude * 100) / 100, propia: true });
+    if (si) si();
+  }, function () { if (no) no(); }, { timeout: 10000, maximumAge: 600000 });
+}
 function elegirLugar() {
-  var mio = navigator.geolocation ? el("button", { "class": "boton", onclick: function () {
-    navigator.geolocation.getCurrentPosition(function (p) {
-      cerrar(); cargar({ nombre: "Mi ubicación", lat: Math.round(p.coords.latitude * 100) / 100, lon: Math.round(p.coords.longitude * 100) / 100 });
-    }, function () { mio.textContent = "No se pudo obtener la ubicación"; }, { timeout: 10000 });
+  var mio = navigator.geolocation && window.isSecureContext ? el("button", { "class": "boton", onclick: function () {
+    ubicar(cerrar, function () { mio.textContent = "No se pudo obtener la ubicación"; });
   } }, "Usar mi ubicación") : null;
   buscadorLugar(function (q) {
     return pedir(BUSCAR + parametros({ name: q, count: 12, language: "es", format: "json" })).then(function (r) {
@@ -1618,7 +1628,13 @@ function elegirLugar() {
 function arrancar() {
   $("b-actualizar").addEventListener("click", function () { cargar(lugarActual()); });
   $("b-lugar").addEventListener("click", elegirLugar);
-  cargar(lugarGuardado());
+  var b = $("b-ubicacion"), guardado = lugarGuardado();
+  if (navigator.geolocation && window.isSecureContext) {
+    b.hidden = false;
+    b.addEventListener("click", function () { b.textContent = "Buscando…"; ubicar(function () { b.textContent = "Mi ubicación"; }, function () { b.textContent = "Sin permiso de ubicación"; }); });
+  }
+  cargar(guardado);
+  if (guardado.propia && navigator.permissions && window.isSecureContext) navigator.permissions.query({ name: "geolocation" }).then(function (p) { if (p.state === "granted") ubicar(); }).catch(function () {});
   setInterval(function () { if (!document.hidden) cargar(lugarActual()); }, ACTUALIZAR_MIN * 60000);
 }
 function lugarActual() { return UI.lugar || lugarGuardado(); }
