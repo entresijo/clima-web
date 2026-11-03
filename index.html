@@ -96,6 +96,10 @@ button { cursor: pointer; }
 .senal ul { grid-column: 2; margin: 3px 0 0; padding: 0 0 0 17px; font-size: 13.5px; }
 .banda-alerta { display: flex; gap: 10px; align-items: baseline; padding: 10px 16px; margin-bottom: 12px; border-radius: 10px; background: var(--editado-fondo); color: var(--tinta); border: 1px solid var(--atencion); font-size: 15px; }
 .banda-alerta b { color: var(--atencion); font-size: 16px; white-space: nowrap; }
+.alerta-una + .alerta-una { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--trazo); }
+.alerta-una summary { cursor: pointer; }
+.alerta-horas { color: var(--tinta2); }
+.alerta-texto { margin: 6px 0 2px; line-height: 1.45; }
 .hoy-grid { display: grid; grid-template-columns: minmax(0, 2.5fr) minmax(0, 3.6fr) minmax(0, 3.3fr) minmax(0, 3fr); gap: 12px; margin-bottom: 12px; }
 .temp-hoy { font-size: 34px; font-weight: 600; line-height: 1.1; }
 @media (max-width: 1280px) {
@@ -561,16 +565,18 @@ function nivelFWI(f) { return f < 6 ? "Bajo" : f < 15 ? "Moderado" : f < 28 ? "A
 function renglonDato(ic, val, eti, sub, cl) {
   var f = el("div", { "class": "dato-fila" }, [
     el("div", { "class": "ind-ico" }, typeof ic === "string" ? icono(ic, 16) : ic),
-    el("div", { "class": "dato-txt" }, [el("div", { "class": "ind-eti", text: eti }), sub ? el("div", { "class": "dato-sub", text: sub }) : null]),
+    el("div", { "class": "dato-txt" }, [el("div", { "class": "ind-eti", text: eti }), sub ? el("div", { "class": "dato-sub" }, sub) : null]),
     el("div", { "class": "dato-val din" }, val)]);
   if (cl) f.setAttribute("data-clave", cl);
   return f;
 }
 function tiraDatos() {
+  var _ultimo = null;
+  renglonesUltimo = function () { return _ultimo; };
   var d = UI.loc ? {} : (L.datos || {}), v = vivoV(), a = v.actual || {}, q = v.aire || {}, as = v.astro || {}, ca = UI.loc ? { luna: (L.astro || {}).luna } : (L.astro || {}), gr = {}, ex = extrasDeHoras(v);
   var cape = hay(d.cape_max) ? d.cape_max : ex.cape, cota = hay(d.cota_cero) ? d.cota_cero : ex.cero, suelo = hay(d.suelo_min) ? d.suelo_min : ex.suelo;
   function poner(g, ic, val, eti, sub, cl) {
-    if (hay(val)) (gr[g] = gr[g] || []).push(renglonDato(ic, val, eti, sub, cl));
+    if (hay(val)) { _ultimo = renglonDato(ic, val, eti, sub, cl); (gr[g] = gr[g] || []).push(_ultimo); }
   }
   var wa = clave("Viene de", "WeatherAPI, consultado por el panel", "Boletín", "no lo usa");
   // Lo consultado por el panel manda; desde v21.30 la corrida guarda lo mismo, por si la consulta falla.
@@ -602,6 +608,16 @@ function tiraDatos() {
   if (sat && sat.focos && sat.focos.estado === "ok" && sat.focos.dato && hay(sat.focos.dato.focos)) {
     poner("Riesgos", "fuego", marcado("focos", sat.focos.dato.focos, String(sat.focos.dato.focos)), "Focos de calor a 50 km", sat.focos.dato.focos ? "El más cercano a " + sat.focos.dato.mas_cercano_km + " km" : "Imagen del satélite",
       clave("Viene de", "la capa satelital del VPS: GOES-19 (FDC)", "Ojo", "un foco no es un incendio confirmado"));
+  }
+  // Radar del OHMC: el núcleo más cercano y la intensidad cerca del pueblo. Escala del OHMC: 40-50 lluvia
+  // intensa, 60 o más lluvia muy intensa y granizo. No asegura ver el pueblo: la sierra puede tapar.
+  var rd = UI.loc ? null : L.radar;
+  if (rd) {
+    var rc = rd.cercano ? rd.radares[rd.cercano] : null, claveRadar = clave("Viene de", "radar del OHMC (WebMet), guardado cada 10 min", "Ojo", "el haz pasa alto y la sierra puede tapar: no asegura ver el pueblo", "Hora", rd.hora);
+    poner("Riesgos", "rayo", rc ? marcado("rayo_km", rc.nucleo_km, Math.round(rc.nucleo_km) + " km") : "Ninguno", "Radar: núcleo de tormenta",
+      rc ? marcado("dbz", rc.nucleo_dbz, rc.nucleo_dbz + " dBZ") : "A 40 km o menos", claveRadar);
+    if (rc) { var ult = renglonesUltimo(); if (ult) ult.lastChild.previousSibling.appendChild(document.createTextNode(", " + rd.cercano + (rc.tendencia ? " · " + rc.tendencia : ""))); }
+    if (hay(rd.max_5km)) poner("Riesgos", "lluvia", marcado("dbz", rd.max_5km, rd.max_5km + " dBZ"), "Radar a 5 km del pueblo", rd.max_5km >= 60 ? "Lluvia muy intensa y granizo" : rd.max_5km >= 40 ? "Lluvia intensa" : "Débil o nada", claveRadar);
   }
   poner("Riesgos", "suelo", hay(suelo) ? fmt(Math.round(suelo * 10) / 10) + "°" : null, "Mínima del suelo");
   var sale = as.sale_sol || (ca.sol && ca.sol.sale), pone = as.pone_sol || (ca.sol && ca.sol.pone);
@@ -1484,6 +1500,7 @@ var ESCALA = {
   prob: [[70, "amarillo"]],
   rayo_km: [[50, "amarillo"], [20, "naranja"], [10, "rojo"]],
   focos: [[1, "naranja"]],
+  dbz: [[40, "amarillo"], [50, "naranja"], [60, "rojo"]],
   cape: [[800, "amarillo"], [2500, "naranja"], [4000, "rojo"]],
   fwi: [[15, "amarillo"], [28, "naranja"], [46, "rojo"]],
   uv: [[3, "amarillo"], [6, "naranja"], [8, "rojo"], [11, "violeta"]],
@@ -1493,7 +1510,7 @@ var ESCALA_PATAGONIA = {
   rafaga: [[80, "amarillo"], [110, "naranja"], [140, "rojo"]],
   viento: [[65, "amarillo"], [90, "naranja"], [110, "rojo"]]
 };
-var NOMBRE_ESCALA = { rafaga: "Ráfaga, SMN", viento: "Viento sostenido, SMN", lluvia: "Lluvia, SMN", calor: "Temperatura alta", frio: "Helada", prob: "Probabilidad de lluvia", rayo_km: "Rayo más cercano, km", focos: "Focos de calor", cape: "CAPE en J/kg", fwi: "FWI, escala de Córdoba", uv: "Índice UV, OMS", aire: "Índice de aire, EPA" };
+var NOMBRE_ESCALA = { rafaga: "Ráfaga, SMN", viento: "Viento sostenido, SMN", lluvia: "Lluvia, SMN", calor: "Temperatura alta", frio: "Helada", prob: "Probabilidad de lluvia", rayo_km: "Rayo más cercano, km", focos: "Focos de calor", dbz: "Radar en dBZ, escala del OHMC", cape: "CAPE en J/kg", fwi: "FWI, escala de Córdoba", uv: "Índice UV, OMS", aire: "Índice de aire, EPA" };
 var COL = { ohmc: "var(--f-ohmc)", weatherapi: "var(--f-weatherapi)", openmeteo: "var(--f-openmeteo)",
   smn: "var(--f-smn)", fwi: "var(--f-fwi)", goes: "var(--f-goes)", calculado: "var(--f-calculado)" };
 var HORA = 3600000, DIA = 24 * HORA, MINIMO_VISTA = 3 * HORA;
@@ -1505,6 +1522,7 @@ var ESTACION_RADIO_KM = 25, ESTACION_FRESCA_H = 2;
 var PALABRAS = { sin_lluvia: "Sin lluvia", lluvia: "Lluvia", llovizna: "Llovizna", lluvia_intermitente: "Lluvia intermitente",
   lluvia_cediendo: "Lluvia cediendo", probable: "Probable", fuerte: "Fuerte" };
 var _estaciones = null;
+var renglonesUltimo = function () { return null; };
 
 var LUGAR_INICIAL = { nombre: "La Población, Córdoba", lat: -32.0667, lon: -65.0333 };
 var ACTUALIZAR_MIN = 15;
