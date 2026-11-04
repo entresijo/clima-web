@@ -571,6 +571,25 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 .v-F .tc-ahora .tc-h { color: var(--tinta); }
 .v-F .tile > svg { color: var(--tinta2); }
 .v-F .tile-lluvia > svg { color: var(--acento); }
+
+.datos-f { margin-top: 14px; }
+.tile-atencion { box-shadow: inset 0 0 0 1.5px var(--trazo); }
+.tile-atencion .tile-v { font-size: 22px; }
+.tile-atencion.nv-lluvia { box-shadow: inset 0 0 0 1.5px var(--acento); }
+.tile-atencion.nv-amarillo { box-shadow: inset 0 0 0 1.5px var(--n-amarillo); }
+.tile-atencion.nv-naranja { box-shadow: inset 0 0 0 1.5px var(--n-naranja); }
+.tile-atencion.nv-rojo { box-shadow: inset 0 0 0 1.5px var(--n-rojo); }
+.tile-atencion.nv-violeta { box-shadow: inset 0 0 0 1.5px var(--n-violeta); }
+.v-F .tile-atencion.nv-lluvia > svg { color: var(--acento); }
+.v-F .tile-atencion.nv-amarillo > svg { color: var(--n-amarillo); }
+.v-F .tile-atencion.nv-naranja > svg { color: var(--n-naranja); }
+.v-F .tile-atencion.nv-rojo > svg { color: var(--n-rojo); }
+.datos-f .tiles { margin: 0 0 10px; }
+.minis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 6px; padding-top: 10px; border-top: 1px solid var(--trazo); }
+.mini { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 3px; min-width: 0; }
+.mini > svg { color: var(--tinta3); }
+.mini-v { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mini-c { font-size: 13px; color: var(--tinta3); line-height: 1.15; }
 .f-pie { margin: 12px 0 0; font-size: 13px; color: var(--tinta3); line-height: 1.4; }
 @media (max-width: 1040px) { .bloque-junto { grid-column: auto; } }
 .franja-hoy { margin: 10px -6px 0; padding: 10px 12px; border-radius: 8px; background: var(--hoja2); border-left: 4px solid var(--pron); }
@@ -2133,14 +2152,39 @@ function pieF(A) {
   return el("p", { "class": "f-pie", text: t + "." });
 }
 function recuadrosF(A, horas, x) {
-  var r = [], hh = new Date(vivoV().capturado).getHours(), noche = hh >= 18, tramo = horas.filter(function (z) { return noche || z.hoy; });
-  var pico = tramo.reduce(function (a, b) { return !a || (b.prob || 0) > (a.prob || 0) ? b : a; }, null), mm = tramo.reduce(function (s_, z) { return s_ + z.mm; }, 0);
-  if (A.lloviendo) r.push(recuadro("lluvia", "Llueve", "ahora", "tile-lluvia"));
-  else if (pico && pico.prob >= 20) r.push(recuadro("gota", marcado("prob", pico.prob, pico.prob + " %"), "lluvia a las " + pico.h + (mm >= 0.1 ? ", " + mm1(mm) : ""), "tile-lluvia"));
-  else r.push(recuadro("gota", "0 %", noche ? "lluvia esta noche" : "lluvia hoy", "tile-lluvia"));
-  if (x && x.rafaga !== null && x.rafaga >= 40) r.push(recuadro("viento", marcado("rafaga", x.rafaga, Math.round(x.rafaga) + ""), "ráfagas, km/h"));
-  if (hay(A.llovio) && A.llovio >= 0.1) r.push(recuadro("lluvia", mm1(A.llovio), A.med.medido && hay(A.med.lluvia_dia) ? "llovió hoy, medido" : "llovió hoy, modelo"));
-  return el("div", { "class": "tiles" }, r);
+  var V = vivoV(), a = V.actual || {}, d = UI.loc ? {} : (L.datos || {}), q = V.aire || {}, as = V.astro || {};
+  var hh = new Date(V.capturado).getHours(), noche = hh >= 18, tramo = horas.filter(function (z) { return noche || z.hoy; });
+  var pico = tramo.reduce(function (p, b) { return !p || (b.prob || 0) > (p.prob || 0) ? b : p; }, null), mm = tramo.reduce(function (s_, z) { return s_ + z.mm; }, 0);
+  var arriba = [], abajo = [];
+  function dato(atencion, nivel, ic, valor, pie) { (atencion ? arriba : abajo).push({ nivel: nivel, ic: ic, valor: valor, pie: pie }); }
+  // Lluvia: atención desde 40 % o si ya llueve.
+  var pp = pico ? pico.prob || 0 : 0;
+  if (A.lloviendo) dato(true, "lluvia", "lluvia", "Llueve", "ahora" + (mm >= 0.1 ? ", " + mm1(mm) + " más" : ""));
+  else dato(pp >= 40, pp >= 70 ? "amarillo" : "lluvia", "lluvia", marcado("prob", pp, pp + " %"), pp >= 20 ? "lluvia a las " + pico.h + (mm >= 0.1 ? ", " + mm1(mm) : "") : noche ? "lluvia esta noche" : "lluvia hoy");
+  // Viento: la ráfaga manda; atención desde el amarillo del SMN. Si no, el viento de ahora con su rumbo.
+  var raf = x && x.rafaga !== null ? x.rafaga : null, cR = colorDe("rafaga", raf);
+  if (cR) dato(true, cR, "viento", marcado("rafaga", raf, Math.round(raf) + " km/h"), "ráfagas hasta");
+  if (hay(A.viento)) dato(false, "", "viento", Math.round(A.viento) + " km/h", (A.dir || "viento") + (!cR && raf >= 30 ? ", ráfagas " + Math.round(raf) : ""));
+  // Sensación: atención si es de calor fuerte o de helada.
+  var sens = hay(a.feelslike_c) ? a.feelslike_c : d.sensacion, cS = hay(sens) ? colorDe(colorDe("frio", sens) ? "frio" : "calor", sens) : "";
+  if (hay(sens)) dato(!!cS, cS, "termo", marcaTemp(sens, Math.round(sens) + "°"), "sensación");
+  if (hay(A.hum)) dato(false, "", "humedad", fmt(A.hum) + " %", "humedad");
+  // UV: atención desde alto (6, OMS). Solo de día.
+  var uv = hay(a.uv) ? a.uv : d.uv;
+  if (hay(uv) && hh >= 7 && hh < 19) dato(uv >= 6, colorDe("uv", uv), "sol", marcado("uv", uv, String(Math.round(uv))), "UV " + nivelUV(uv).toLowerCase());
+  // Aire: atención desde "mala para sensibles" (EPA 3).
+  var epa = hay(q.epa) ? q.epa : d.epa;
+  if (hay(epa)) dato(epa >= 3, colorDe("aire", epa), "hoja", marcado("aire", epa, epa === 3 ? "Mala" : String(AIRE_EPA[epa] || epa)), epa === 3 ? "aire, para sensibles" : "aire");
+  // Lo que llovió: atención desde 10 mm.
+  if (hay(A.llovio)) dato(A.llovio >= 10, colorDe("lluvia", A.llovio), "pluviometro", marcado("lluvia", A.llovio, mm1(A.llovio)), A.med.medido && hay(A.med.lluvia_dia) ? "llovió, medido" : "llovió hoy");
+  // El sol: lo próximo que pasa, salida o puesta.
+  var sale = as.sale_sol, pone = as.pone_sol, hm = ("0" + hh).slice(-2) + ":" + ("0" + new Date(V.capturado).getMinutes()).slice(-2);
+  if (sale && pone) dato(false, "", "amanecer", hm < pone && hm >= sale ? pone : sale, hm < pone && hm >= sale ? "se pone el sol" : "sale el sol");
+  function caja(r, grande) {
+    return el("div", { "class": (grande ? "tile tile-atencion" : "mini") + (r.nivel ? " nv-" + r.nivel : "") }, [icono(r.ic, grande ? 22 : 18), el("div", { "class": (grande ? "tile-v" : "mini-v") + " din" }, r.valor), el("div", { "class": grande ? "tile-c" : "mini-c" }, r.pie)]);
+  }
+  return el("div", { "class": "datos-f" }, [arriba.length ? el("div", { "class": "tiles" }, arriba.map(function (r) { return caja(r, true); })) : null,
+    el("div", { "class": "minis" }, abajo.map(function (r) { return caja(r, false); }))]);
 }
 var ICONOS = {
   humedad: ["M12 3.5s6.5 7 6.5 11.5a6.5 6.5 0 0 1-13 0C5.5 10.5 12 3.5 12 3.5z"],
@@ -2159,7 +2203,8 @@ var ICONOS = {
   suelo: ["M3 9h18", "M6 13h12", "M9 17h6", "M12 2.500v3.500"],
   amanecer: ["M7 16a5 5 0 0 1 10 0", "M2.500 19.500h19", "M12 4v3", "M4.500 9l2 2", "M19.500 9l-2 2"],
   paraguas: ["M3 12a9 9 0 0 1 18 0z", "M12 12v6.500a2 2 0 0 1-4 0", "M12 3v-.500"],
-  gota: ["M12 3.5s6.5 7 6.5 11.5a6.5 6.5 0 0 1-13 0C5.5 10.5 12 3.5 12 3.5z"]
+  gota: ["M12 3.5s6.5 7 6.5 11.5a6.5 6.5 0 0 1-13 0C5.5 10.5 12 3.5 12 3.5z"],
+  pluviometro: ["M7.5 3.5h9l-1.5 17h-6z", "M8.4 9h3.6", "M8.8 13h3.2", "M9.1 17h2.9"]
 };
 var AIRE_EPA = { 1: "Buena", 2: "Moderada", 3: "Mala para sensibles", 4: "Mala", 5: "Muy mala", 6: "Peligrosa" };
 var FRANJAS = [["Madrugada", 0, 6], ["Mañana", 6, 11], ["Mediodía", 11, 14], ["Tarde", 14, 19], ["Noche", 19, 24]];
