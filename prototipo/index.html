@@ -1832,7 +1832,10 @@ function fraseTemp(A, horas) {
   if (!horas.length) return null;
   var hh = new Date(vivoV().capturado).getHours(), out = [], hoy = horas.filter(function (x) { return x.hoy; });
   var max = hoy.length ? hoy.reduce(function (a, b) { return b.temp > a.temp ? b : a; }) : null, min = minNoche(horas);
-  if (hh < 15 && max && (!hay(A.temp) || max.temp > A.temp + 0.5)) out.push("Sube hasta ", marcaTemp(max.temp, Math.round(max.temp) + "°"), " cerca de las ", negrita(max.h + " h"), ". ");
+  // Se compara lo que se lee, redondeado: con 24° medidos, "sube hasta 24°" (24,4 del modelo) era falso.
+  var sube = max && (!hay(A.temp) || Math.round(max.temp) > Math.round(A.temp)), igual = max && hay(A.temp) && Math.round(max.temp) === Math.round(A.temp);
+  if (hh < 15 && sube) out.push("Sube hasta ", marcaTemp(max.temp, Math.round(max.temp) + "°"), " cerca de las ", negrita(max.h + " h"), ". ");
+  else if (hh < 15 && igual && max.h > hh + 1) out.push("Se mantiene en ", marcaTemp(max.temp, Math.round(max.temp) + "°"), " hasta las ", negrita(max.h + " h"), ". ");
   if (min) out.push(min.h < 7 ? "De madrugada baja a " : "A la noche baja a ", marcaTemp(min.temp, Math.round(min.temp) + "°"), " (" + min.h + " h).");
   return out.length ? out : null;
 }
@@ -1918,7 +1921,7 @@ function curvaDia(A, horas) {
     }
     if (horas.length) {
       var mnF = minNoche(horas) || horas.reduce(function (a, b) { return b.temp < a.temp ? b : a; }), mxF = horas.reduce(function (a, b) { return b.temp > a.temp ? b : a; });
-      if (!hay(A.temp) || mxF.temp > A.temp + 0.5) rotulo(mxF.t, mxF.temp, Math.round(mxF.temp) + "° a las " + mxF.h, true);
+      if (!hay(A.temp) || Math.round(mxF.temp) > Math.round(A.temp)) rotulo(mxF.t, mxF.temp, Math.round(mxF.temp) + "° a las " + mxF.h, true);
       rotulo(mnF.t, mnF.temp, Math.round(mnF.temp) + "° a las " + mnF.h, false);
     }
     var ahoraV = hay(A.temp) ? A.temp : arranque;
