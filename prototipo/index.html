@@ -1978,6 +1978,25 @@ function bloqueVariante(v, movil) {
   if (!movil && v !== "E") sec.appendChild(el("div", { "class": "ah-pie" }, botonFranjas()));
   return sec;
 }
+function bandaAlertas(s) {
+  var l = s.alertas_lista || [], t = s.alertas_textos || {};
+  if (!l.length) return s.alerta ? el("div", { "class": "banda-alerta", role: "alert" }, [el("b", { text: "▲ ALERTA" }), el("span", { text: s.alerta })]) : null;
+  var nivel = { minor: ["amarilla", "amarillo"], moderate: ["amarilla", "amarillo"], severe: ["naranja", "naranja"], extreme: ["roja", "rojo"] };
+  return el("div", { "class": "banda-alerta", role: "alert", style: "display:block" }, l.map(function (a) {
+    var n = nivel[a.severity] || ["", "amarillo"], txt = t[a.evento + "|" + a.severity] || {}, desc = a.descripcion || txt.descripcion, zona = (Array.isArray(a.zona) ? a.zona.join(", ") : a.zona) || txt.zona;
+    var d = el("details", { "class": "alerta-una" }, [
+      el("summary", {}, [el("b", { "class": "nivel nivel-" + n[1], text: "▲ Alerta " + n[0] }), " por " + String(a.evento || "").toLowerCase() + (a.granizo === true || a.granizo === "True" ? ", con granizo" : ""),
+        el("span", { "class": "alerta-horas", text: " · desde " + (fechaHora(a.onset) || "ya") + " hasta " + fechaHora(a.expires) + (a.emitida ? " · emitida " + fechaHora(a.emitida) : "") })]),
+      desc ? el("p", { "class": "alerta-texto", text: desc }) : el("p", { "class": "nota", text: "El SMN no mandó el texto de esta alerta." }),
+      zona ? el("p", { "class": "nota", text: "Abarca: " + zona }) : null]);
+    return d;
+  }).concat(s.alerta ? [el("details", { "class": "alerta-una" }, [el("summary", { "class": "nota", text: "Cómo lo dice el boletín" }), el("p", { "class": "alerta-texto", text: s.alerta })])] : []));
+}
+function fechaHora(iso) {
+  var d = new Date(iso);
+  if (!iso || isNaN(d.getTime())) return "";
+  return ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"][d.getDay()] + " " + d.getDate() + "/" + (d.getMonth() + 1) + " " + ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+}
 var ICONOS = {
   humedad: ["M12 3.5s6.5 7 6.5 11.5a6.5 6.5 0 0 1-13 0C5.5 10.5 12 3.5 12 3.5z"],
   viento: ["M3 9h11a3 3 0 1 0-3-3", "M3 14h15a3 3 0 1 1-3 3", "M3 19h6"],
@@ -2054,6 +2073,56 @@ var SERIES = {
   lluvia: { nombre: "Lluvia", u: " mm", acumula: true, s: [["lluvia_dia", "openmeteo", EST, "5 4", 2.4]] }
 };
 var RUMBOS_CORTOS = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"];
+// Alertas del SMN de todo el país, republicadas por el VPS: el SMN no deja que un navegador lea sus avisos desde
+// otro sitio. Se rehace cada 5 minutos; se pide como mucho cada 5 minutos por visitante (límite: 30 por minuto).
+var ALERTAS = "https://datos.entresijo.org/alertas.json", ALERTAS_CADA_MIN = 5, ALERTAS_VIEJAS_MIN = 15;
+var alertasLeidas = { datos: null, en: 0, fallo: false };
+function pedirAlertas() {
+  if (alertasLeidas.datos && Date.now() - alertasLeidas.en < ALERTAS_CADA_MIN * 60000) return Promise.resolve(alertasLeidas.datos);
+  return pedir(ALERTAS).then(function (d) { alertasLeidas = { datos: d, en: Date.now(), fallo: false }; return d; })
+    .catch(function () { alertasLeidas.fallo = true; return alertasLeidas.datos; });
+}
+// Punto dentro de un polígono [[lat, lon], …], por cruces del rayo.
+function dentroDe(lat, lon, pol) {
+  var adentro = false;
+  for (var i = 0, j = pol.length - 1; i < pol.length; j = i++) {
+    var yi = pol[i][0], xi = pol[i][1], yj = pol[j][0], xj = pol[j][1];
+    if ((yi > lat) !== (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) adentro = !adentro;
+  }
+  return adentro;
+}
+// Las alertas que tocan el lugar. Las vencidas se ocultan también acá, por si el VPS se atrasa (pedido de Clima 22,
+// 4/11); las que no traen "vence" quedan. Una reemisión igual (evento, nivel y vencimiento) se muestra una vez.
+function alertasDelLugar(d, lugar) {
+  if (!d || !lugar) return [];
+  var ahora = Date.now(), vistas = {};
+  return (d.alertas || []).filter(function (a) {
+    if (a.vence && new Date(a.vence).getTime() < ahora) return false;
+    if (!(a.poligonos || []).some(function (id) { var p = (d.poligonos || {})[id]; return p && dentroDe(lugar.lat, lugar.lon, p); })) return false;
+    var k = a.evento + "|" + a.severidad + "|" + a.vence;
+    if (vistas[k]) return false;
+    vistas[k] = true;
+    return true;
+  }).map(function (a) {
+    return { severity: a.severidad, evento: a.evento, onset: a.inicio, expires: a.vence, emitida: a.emitida, descripcion: a.descripcion, zona: a.zona,
+      granizo: /granizo/i.test(String(a.titular || "") + " " + String(a.evento || "")) };
+  });
+}
+// La banda va arriba de todo. Sin alertas no ocupa lugar; el pie dice que se consultaron.
+function bandaDelLugar() {
+  var d = alertasLeidas.datos, lista = alertasDelLugar(d, UI.lugar), viejo = d && d.revisado_utc ? Math.round((Date.now() - new Date(d.revisado_utc).getTime()) / 60000) : null;
+  if (!lista.length) return null;
+  var b = bandaAlertas({ alertas_lista: lista });
+  if (viejo !== null && viejo > ALERTAS_VIEJAS_MIN) b.appendChild(el("p", { "class": "nota", style: "margin:6px 0 0", text: "Dato viejo: las alertas se revisaron hace " + viejo + " min." }));
+  return b;
+}
+function pieAlertas() {
+  var d = alertasLeidas.datos;
+  if (!d) return el("p", { "class": "nota pie-datos", text: "No se pudieron consultar las alertas del SMN." });
+  var n = alertasDelLugar(d, UI.lugar).length, rev = d.revisado_utc ? new Date(d.revisado_utc) : null;
+  return el("p", { "class": "nota pie-datos", text: "Alertas: Servicio Meteorológico Nacional" + (rev ? ", revisadas a las " + ("0" + rev.getHours()).slice(-2) + ":" + ("0" + rev.getMinutes()).slice(-2) : "") +
+    (n ? "." : ". Ninguna vigente para este lugar.") + (alertasLeidas.fallo ? " La última consulta falló: se muestra la anterior." : "") });
+}
 var capturadoEn = 0;
 
 // Fase e iluminación por la fórmula de baja precisión de Meeus, la misma de panel.py.
@@ -2117,11 +2186,14 @@ function hayValor(x) { return x !== null && x !== undefined; }
 function pintar() {
   var v = vaciar($("vista"));
   $("m-lugar").textContent = UI.loc;
+  var banda = bandaDelLugar();
+  if (banda) v.appendChild(banda);
   vistaLugar(v);
   var g = el("section", { "class": "hoja bloque", style: "margin-top:12px", "aria-label": "Gráfico" });
   v.appendChild(g);
   grafico(g);
   v.appendChild(pieFuentes());
+  v.appendChild(pieAlertas());
 }
 function pintarLeido() {
   var h = capturadoEn ? ("0" + new Date(capturadoEn).getHours()).slice(-2) + ":" + ("0" + new Date(capturadoEn).getMinutes()).slice(-2) : "";
@@ -2138,7 +2210,7 @@ function cargar(lugar) {
     hourly: "temperature_2m,relative_humidity_2m,dew_point_2m,precipitation_probability,precipitation,cloud_cover,wind_speed_10m,wind_gusts_10m,uv_index,visibility,cape,freezing_level_height,soil_temperature_0cm",
     daily: "sunrise,sunset" });
   var aire = AIRE + parametros({ latitude: lugar.lat, longitude: lugar.lon, timezone: "auto", current: "pm2_5,us_aqi" });
-  return Promise.all([pedir(pron), pedir(aire).catch(function () { return null; }), estacionCerca(lugar)]).then(function (r) {
+  return Promise.all([pedir(pron), pedir(aire).catch(function () { return null; }), estacionCerca(lugar), pedirAlertas()]).then(function (r) {
     UI.loc = lugar.nombre; UI.locVivo = aVivo(r[0], r[1]); UI.estacion = r[2]; capturadoEn = Date.now(); aLectura(UI.locVivo);
     try { localStorage.setItem("clima-lugar", JSON.stringify(lugar)); } catch (e) { /* solo es comodidad */ }
     // Un error al dibujar no es falta de conexión: se dice distinto y queda en la consola.
