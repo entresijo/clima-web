@@ -785,16 +785,20 @@ function tiraDatos() {
   var ry = sat && sat.rayos && sat.rayos.estado === "ok" ? sat.rayos.dato : null, rd = UI.loc ? null : L.radar;
   var rc = rd && rd.cercano ? rd.radares[rd.cercano] : null;
   if (!UI.loc) {
-    var hayRayo = !!(ry && hay(ry.mas_cercano_km)), tc = tormentaCerca(ry, rc), nivelT = nivelVPS(sat && sat.tormenta) || (tc && tc.nivel);
-    var lugar = tc ? "a " + Math.round(tc.km) + " km" + (tc.rumbo ? " al " + tc.rumbo : "") : "";
+    var hayRayo = !!(ry && hay(ry.mas_cercano_km)), tc = tormentaCerca(ry, rc), nivelT = nivelVPS(sat && sat.tormenta);
+    // Del VPS (desde el 13/11, 23:03 UTC): nivel y disparo, con su regla. Sin la parte, la distancia sin color.
+    var tv = sat && sat.tormenta && sat.tormenta.estado !== "error" ? sat.tormenta.dato : null, dp = tv && tv.disparo;
+    if (tv && dp && hay(dp.km)) tc = { km: dp.km, rumbo: dp.rumbo };
+    var lugar = tc && !(tv && tv.estado === "sin_tormenta") ? "a " + Math.round(tc.km) + " km" + (tc.rumbo ? " al " + tc.rumbo : "") : "";
     var valor = lugar || (ry || rd ? "Sin tormenta a 50 km" : "Sin datos");
+    var radarUnico = tv && dp && dp.origen === "radar" && (tv.radares_confirmados || []).length < 2;
     var lRayos = !ry ? "Rayos: sin datos del VPS" : hayRayo ? "Rayos: " + ry.rayos_50km + " a 50 km" + (ry.rayos_20km ? ", " + ry.rayos_20km + " a 20 km" : "") + ", el más cercano a " + ry.mas_cercano_km + " km" + (ry.rumbo ? " al " + ry.rumbo : "") + (L.satelite_tendencia ? " · " + L.satelite_tendencia : "")
       : "Rayos: ninguno a 50 km en los últimos " + (ry.ventana_min || 15) + " min";
     var lRadar = !rd ? "Radar: sin datos de los últimos 40 min" : rc ? ["Radar: núcleo de ", marcado("dbz", rc.nucleo_dbz, rc.nucleo_dbz + " dBZ"), " a " + Math.round(rc.nucleo_km) + " km" + (rc.rumbo ? " al " + rc.rumbo : "") + ", " + rd.cercano + (rc.tendencia ? " · " + rc.tendencia : "")]
       : "Radar: ningún núcleo a 40 km o menos";
-    var claveT = clave("Viene de", "la capa del VPS: rayos del GOES-19 (GLM) en 15 min y radar del OHMC (WebMet) cada 10 min", "Niveles", "amarillo: en aproximación, 3 o más rayos a 50 km en 15 min o núcleo a 40 km; naranja: a menos de 20 km; rojo: en la zona, a 10 km o menos",
+    var claveT = clave("Viene de", "la capa del VPS: rayos del GOES-19 (GLM) en 15 min y radar del OHMC (WebMet) cada 10 min", "Niveles", "los calcula el VPS. Amarillo: en aproximación, 3 o más rayos a 50 km en 15 min o núcleo a 40 km en dos imágenes; naranja: a 20 km o menos; rojo: en la zona, a 10 km o menos. El radar solo da como mucho amarillo: para naranja o rojo hace falta un rayo o dos radares",
         "Limitación", "el haz del radar pasa alto, la sierra puede tapar y un solo radar puede dar ecos falsos de 60 a 70 dBZ", "Tendencia", "comparando con la lectura anterior", "Hace", (sat && sat.rayos ? sat.rayos.hace_min + " min los rayos" : "") + (rd ? ", radar de las " + String(rd.hora).slice(11, 16) : ""));
-    poner("Tormenta", "rayo", conNivel(nivelT, valor, claveT), nivelT ? NIVEL_TORMENTA[nivelT] : "Tormenta", el("span", {}, [el("div", {}, lRayos), el("div", {}, lRadar)]), claveT);
+    poner("Tormenta", "rayo", conNivel(nivelT, valor, claveT), nivelT ? NIVEL_TORMENTA[nivelT] : "Tormenta", el("span", {}, [el("div", {}, lRayos), el("div", {}, lRadar), radarUnico ? el("div", { text: "Radar único: no se puede descartar eco falso." }) : null]), claveT);
   }
   if (rd && hay(rd.max_5km)) poner("Tormenta", "lluvia", marcado("dbz", rd.max_5km, rd.max_5km + " dBZ"), "Radar a 5 km del pueblo", rd.max_5km >= 60 ? "Lluvia muy intensa y granizo" : rd.max_5km >= 40 ? "Lluvia intensa" : "Débil o nada",
     clave("Viene de", "radar del OHMC (WebMet), cada 10 min, leído desde " + (rd.desde || ""), "Limitación", "el haz pasa alto y la sierra puede tapar: no asegura ver el pueblo", "Hora", rd.hora));
@@ -805,7 +809,9 @@ function tiraDatos() {
       hay(fo.potencia_max_mw) ? el("div", { text: "Potencia de hasta " + fmt(Math.round(fo.potencia_max_mw)) + " MW" }) : null,
       lista.length > 1 ? el("details", {}, [el("summary", { text: "Los " + lista.length + " focos" }), el("div", {}, lista.map(function (x) { return el("div", { text: lineaFoco(x) }); }))]) : null,
       el("div", { text: "Detección satelital: no se puede descartar quema autorizada o foco de calor industrial." })]) : "Imagen de las " + fmtHora(fo.imagen_utc);
+    // El VPS da el nivel por distancia; el riesgo de incendio no le llega, y el panel suma esa parte de la regla.
     var nivelF = nivelVPS(sat.focos) || nivelFoco(fo.mas_cercano_km, d.fwi_hoy);
+    if (nivelF === "naranja" && fo.mas_cercano_km <= 30 && hay(d.fwi_hoy) && d.fwi_hoy >= 28) nivelF = "rojo";
     var valorF = fo.focos && hay(fo.mas_cercano_km) ? "a " + Math.round(fo.mas_cercano_km) + " km" + (fo.rumbo ? " al " + fo.rumbo : "") : "Sin focos a 50 km";
     poner("Riesgos", "fuego", conNivel(nivelF, valorF, clave("Niveles", "amarillo a 50 km o menos, naranja a 30, rojo a 15, o a 30 con riesgo de incendio muy alto o extremo")),
       fo.focos ? (fo.focos === 1 ? "1 foco de calor" : fo.focos + " focos de calor") + " a 50 km" : "Focos de calor", subFocos,
@@ -1724,7 +1730,7 @@ function dibujarNavegador() {
 }
 function pintarSeleccion() { if (_navegador && $("graf-nav")) _navegador(); }
 function nivelVPS(parte) {
-  var n = parte && parte.estado === "ok" && parte.dato ? parte.dato.nivel : null;
+  var n = parte && parte.dato && parte.estado !== "error" ? parte.dato.nivel : null;   // la parte tormenta trae su estado ("cerca"), no "ok"
   return { 1: "amarillo", 2: "naranja", 3: "rojo" }[n] || (/^(amarillo|naranja|rojo)$/.test(n) ? n : null);
 }
 function tormentaCerca(ry, rc) {
