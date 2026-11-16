@@ -607,6 +607,8 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 .ley-rayo { width: 9px; height: 9px; background: linear-gradient(var(--tinta), var(--tinta)) center / 9px 1.6px no-repeat, linear-gradient(var(--tinta), var(--tinta)) center / 1.6px 9px no-repeat; }
 .ley-nucleo { width: 10px; height: 10px; border-radius: 50%; border: 1.6px solid var(--tinta); }
 .ley-foco { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 9px solid var(--n-naranja); }
+.radar-anima { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 8px; }
+.radar-hora { font-size: 14px; color: var(--tinta2); font-variant-numeric: tabular-nums; min-width: 120px; }
 .radar-lineas { list-style: none; margin: 10px 0 0; padding: 8px 0 0; border-top: 1px solid var(--trazo); display: grid; gap: 4px; font-size: 14px; color: var(--tinta2); }
 .f-pie { margin: 12px 0 0; font-size: 13px; color: var(--tinta3); line-height: 1.4; }
 @media (max-width: 1040px) { .bloque-junto { grid-column: auto; } }
@@ -1882,7 +1884,7 @@ function tableroDias(v, ahora, viene) {
   if (A) { var s = ahora(); s.classList.add("bloque-junto"); s.appendChild(franjaHoy({ sinBoton: movil })); ahoraHoy = [s]; }
   else ahoraHoy = [bloqueVariante(varianteActual(), movil)];
   // El radar del VPS, cuando la cáscara lo trae (la pública lo pide; el panel LAN tiene su bloque propio).
-  var radar = UI.cerca ? radarEsquema(UI.cerca.datos, { distanciaLugarKm: UI.cerca.km }) : null;
+  var radar = UI.cerca ? radarEsquema(UI.cerca.datos, UI.cerca.op) : null;
   if (radar) ahoraHoy = ahoraHoy.concat([radar]);
   v.appendChild(selectorVariante());
   if (movil) {
@@ -2251,23 +2253,41 @@ function textoTormenta(t) {
 }
 function radarEsquema(datos, op) {
   op = op || {};
-  var R = op.radioKm || 50, d = datos || {}, sec = el("section", { "class": "hoja bloque radar-esq", "aria-label": "Tormenta, rayos, radar y focos alrededor de La Población" });
+  var R = op.radioKm || 50, d = datos || {}, sec = el("section", { "class": "hoja bloque radar-esq", "aria-label": "Tormenta, rayos, radar y focos alrededor del lugar" });
   var viejo = d.revisado ? minDesde(d.revisado) : null, est = textoTormenta(d.tormenta);
   var centro = (d.centro && d.centro.nombre) || "La Población";
   sec.appendChild(el("div", { "class": "radar-cab" }, [
     el("p", { "class": "radar-estado din" + (est.nivel ? " nivel-" + est.nivel : "") }, [est.nivel ? el("span", { "class": "radar-punto", "aria-hidden": "true" }) : null, est.texto]),
     el("p", { "class": "radar-donde", text: "Alrededor de " + centro + (op.distanciaLugarKm >= 2 ? ", a " + Math.round(op.distanciaLugarKm) + " km del lugar elegido" : "") + " · esquema, no es un mapa" })]));
-  // El dibujo: un cuadrado de 2 × R km, norte arriba. 300 unidades = 2R km.
+  // Un cuadrado de 2 × R km, norte arriba: 300 unidades = 2R km.
   var L = 300, K = L / (2 * R), C = L / 2;
   function XY(km, g) { var a = (g || 0) * Math.PI / 180; return [C + Math.sin(a) * km * K, C - Math.cos(a) * km * K]; }
+  function XYd(dx, dy) { return [C + dx * K, C - dy * K]; }
   var s = svg("svg", { viewBox: "0 0 " + L + " " + L, "class": "radar-svg", role: "img", "aria-label": "Esquema de " + R + " km alrededor de " + centro });
+  var recorte = svg("clipPath", { id: "radar-circulo" }), defs = svg("defs", {});
+  recorte.appendChild(svg("circle", { cx: C, cy: C, r: R * K })); defs.appendChild(recorte); s.appendChild(defs);
+  // La base, debajo de todo y en gris: rutas, ríos y localidades, para ubicarse. Orientativa.
+  var b = op.base, gb = svg("g", { "clip-path": "url(#radar-circulo)" });
+  if (b) {
+    function linea_(pts, attrs) { if (pts.length > 1) gb.appendChild(svg("path", Object.assign({ d: pts.map(function (p, i) { var q = XYd(p[0], p[1]); return (i ? "L" : "M") + q[0].toFixed(1) + " " + q[1].toFixed(1); }).join(""), fill: "none" }, attrs))); }
+    (b.rios || []).forEach(function (p) { linea_(p, { stroke: "var(--pron)", "stroke-width": 1, opacity: 0.55 }); });
+    (b.rutas || []).forEach(function (p) { linea_(p, { stroke: "var(--tinta3)", "stroke-width": 0.9, opacity: 0.6 }); });
+    var puestas = [];
+    (b.localidades || []).forEach(function (l) {
+      var km = Math.sqrt(l.dx * l.dx + l.dy * l.dy);
+      if (km < 3 || km > R * 0.92 || puestas.length >= 7 || puestas.some(function (q) { return Math.abs(q[0] - l.dx) < 12 && Math.abs(q[1] - l.dy) < 5; })) return;
+      puestas.push([l.dx, l.dy]);
+      var q = XYd(l.dx, l.dy);
+      gb.appendChild(svg("circle", { cx: q[0], cy: q[1], r: 1.6, fill: "var(--tinta3)" }));
+      var t = svg("text", { x: q[0] + 4, y: q[1] + 3.5, "font-size": 10.5, fill: "var(--tinta3)" }); t.textContent = l.n; gb.appendChild(t);
+    });
+  }
+  s.appendChild(gb);
   [10, 20, 30, 50].filter(function (k) { return k <= R; }).forEach(function (k) {
     s.appendChild(svg("circle", { cx: C, cy: C, r: k * K - (k === R ? 0.75 : 0), fill: "none", stroke: "var(--trazo)", "stroke-width": k === R ? 1.5 : 1 }));
     // El rótulo va sobre el anillo, un poco al este del norte: sobre el eje se pisaba con la N.
     var pr = XY(k - 1.5, 28), t = svg("text", { x: pr[0], y: pr[1] + 4, "font-size": 11, fill: "var(--tinta3)" }); t.textContent = k + " km"; s.appendChild(t);
   });
-  s.appendChild(svg("line", { x1: C, x2: C, y1: C - R * K + 16, y2: C + R * K - 16, stroke: "var(--trazo)", "stroke-dasharray": "2 4" }));
-  s.appendChild(svg("line", { y1: C, y2: C, x1: C - R * K + 16, x2: C + R * K - 16, stroke: "var(--trazo)", "stroke-dasharray": "2 4" }));
   [["N", C, 13], ["S", C, L - 5], ["E", L - 8, C + 4], ["O", 8, C + 4]].forEach(function (c) {
     var t = svg("text", { x: c[1], y: c[2], "text-anchor": "middle", "font-size": 12, "font-weight": 700, fill: "var(--tinta2)" }); t.textContent = c[0]; s.appendChild(t);
   });
@@ -2292,15 +2312,40 @@ function radarEsquema(datos, op) {
     var p = XY(n.km, n.rumbo), c = colorDe("dbz", n.dbz);
     s.appendChild(svg("circle", { cx: p[0], cy: p[1], r: 4 + Math.max(0, (n.dbz - 35)) / 4, fill: "none", stroke: c ? "var(--n-" + c + ")" : "var(--tinta)", "stroke-width": 1.8, "stroke-dasharray": n.radares > 1 ? "" : "4 2" }));
   });
-  // Rayos: cruces chicas que se apagan con la antigüedad (60 minutos).
+  // Rayos: cruces chicas, más grandes cuantos más hay en la celda, que se apagan con la antigüedad.
+  var gR = svg("g", {});
+  function pintarRayos(lista, fija) {
+    vaciar(gR);
+    (lista || []).forEach(function (r) {
+      if (r.km > R) return;
+      var p = XY(r.km, r.rumbo), m = minDesde(r.hora), a = 3 + Math.min(4, Math.log(r.n || 1) / Math.LN2);
+      var o = fija ? 1 : m === null ? 0.6 : Math.max(0.2, 1 - m / 60);
+      gR.appendChild(svg("path", { d: "M" + (p[0] - a) + " " + p[1] + "h" + 2 * a + "M" + p[0] + " " + (p[1] - a) + "v" + 2 * a, stroke: "var(--tinta)", "stroke-width": 1.6, "stroke-linecap": "round", opacity: o.toFixed(2) }));
+    });
+  }
   var ra = d.rayos;
-  ((ra && ra.lista) || []).forEach(function (r) {
-    if (r.km > R) return;
-    var p = XY(r.km, r.rumbo), m = minDesde(r.hora), op_ = m === null ? 0.6 : Math.max(0.2, 1 - m / 60);
-    s.appendChild(svg("path", { d: "M" + (p[0] - 3.5) + " " + p[1] + "h7M" + p[0] + " " + (p[1] - 3.5) + "v7", stroke: "var(--tinta)", "stroke-width": 1.6, "stroke-linecap": "round", opacity: op_.toFixed(2) }));
-  });
+  pintarRayos(ra && ra.lista);
+  s.appendChild(gR);
   var capa = el("div", { "class": "radar-fondo" }), marco = el("div", { "class": "radar-marco" }, [capa, s]);
   sec.appendChild(marco);
+  // Animación de las últimas horas de rayos: corre solo cuando se pide, y vuelve a la última hora al terminar.
+  var cu = (op.cuadros || []).filter(function (q) { return q.t; });
+  // Solo si en esas horas hubo rayos dentro del círculo.
+  if (cu.length > 1 && cu.some(function (q) { return q.lista.length; })) {
+    var hs_ = Math.max(1, Math.round((Date.now() - new Date(cu[0].t).getTime()) / 3600000)), rotulo_ = hs_ === 1 ? "Ver la última hora" : "Ver las últimas " + hs_ + " h";
+    var hora_ = el("span", { "class": "radar-hora din" }), reloj_ = null, k_ = 0;
+    var boton = el("button", { "class": "boton", "aria-pressed": "false" }, rotulo_);
+    function parar() { clearInterval(reloj_); reloj_ = null; boton.textContent = rotulo_; boton.setAttribute("aria-pressed", "false"); hora_.textContent = ""; pintarRayos(ra && ra.lista); }
+    boton.addEventListener("click", function () {
+      if (reloj_) { parar(); return; }
+      k_ = 0; boton.textContent = "Detener"; boton.setAttribute("aria-pressed", "true");
+      reloj_ = setInterval(function () {
+        if (k_ >= cu.length || !boton.isConnected) { parar(); return; }
+        pintarRayos(cu[k_].lista, true); hora_.textContent = dosHoras(cu[k_].t) + " · " + (cu[k_].lista.length ? cu[k_].lista.reduce(function (s_, r) { return s_ + (r.n || 1); }, 0) + " rayos" : "sin rayos"); k_++;
+      }, 450);
+    });
+    sec.appendChild(el("div", { "class": "radar-anima" }, [boton, hora_]));
+  }
   // El enganche del panel LAN: su capa va debajo del dibujo, con la misma escala.
   if (typeof op.fondo === "function") {
     var pedir_ = function () { if (marco.isConnected && marco.clientWidth) { vaciar(capa); op.fondo(capa, { ladoPx: marco.clientWidth, radioKm: R, pxPorKm: marco.clientWidth / (2 * R), centro: d.centro || null }); } };
@@ -2315,25 +2360,30 @@ function radarEsquema(datos, op) {
   function linea(txt, cl) { lineas.push(el("li", { "class": cl || "" }, txt)); }
   if (!ra) linea("Rayos: sin dato reciente");
   else {
-    var rc = (ra.lista || []).filter(function (r) { return r.km <= 50; }).sort(function (a, b) { return a.km - b.km; })[0];
-    linea(rc ? "Rayos a 50 km en la última hora; el más cercano " + lugarRadar(rc.km, rc.rumbo) + ", " + dosHoras(rc.hora) + "." : "Sin rayos a 50 km en los últimos 60 min");
+    var cerca50 = (ra.lista || []).filter(function (r) { return r.km <= 50; }), rc = cerca50.slice().sort(function (a, b) { return a.km - b.km; })[0];
+    var total = cerca50.reduce(function (s_, r) { return s_ + (r.n || 1); }, 0), contados = cerca50.some(function (r) { return r.n; });
+    linea(rc ? (contados ? total + (total === 1 ? " rayo" : " rayos") + " a 50 km en la última hora" : "Rayos a 50 km en la última hora") + "; el más cercano " + lugarRadar(rc.km, rc.rumbo) + ", " + dosHoras(rc.hora) + "." : "Sin rayos a 50 km en los últimos 60 min");
   }
-  if (!nu) linea("Radar: sin dato reciente");
+  if (op.notaRadar) linea(op.notaRadar);
+  else if (!nu) linea("Radar: sin dato reciente");
   else {
     var nc = (nu.lista || []).slice().sort(function (a, b) { return a.km - b.km; })[0];
     if (!nc || nc.km > 40) linea("Radar: sin núcleos a 40 km" + (nc ? "; el más cercano " + lugarRadar(nc.km, nc.rumbo) : ""));
-    else linea(["Núcleo de ", marcado("dbz", nc.dbz, nc.dbz + " dBZ"), " " + lugarRadar(nc.km, nc.rumbo) + " (" + nc.radar + ")." + (nc.radares > 1 ? "" : " Radar único: no se puede descartar eco falso.")]);
+    else linea(["Núcleo de ", marcado("dbz", nc.dbz, nc.dbz + " dBZ"), " " + lugarRadar(nc.km, nc.rumbo) + (nc.radar ? " (" + nc.radar + ")" : "") + "." + (nc.radares > 1 ? "" : " Radar único: no se puede descartar eco falso.")]);
   }
   if (!fo) linea("Focos de calor: sin dato reciente");
-  else if (!(fo.lista || []).length) linea("Sin focos de calor a 50 km");
+  else if (!(fo.lista || []).filter(function (f) { return f.km <= 50; }).length) linea("Sin focos de calor a 50 km");
   else {
     var f0 = fo.lista[0];
     linea([fo.nivel ? el("span", { "class": "nivel nivel-" + fo.nivel, text: "Foco de calor " + lugarRadar(f0.km, f0.rumbo) }) : "Foco de calor " + lugarRadar(f0.km, f0.rumbo),
-      hay(f0.mw) ? " · " + fmt(Math.round(f0.mw)) + " MW" : "", fo.lista.length > 1 ? " · " + fo.lista.length + " a 50 km" : "", ". Detección satelital: no se puede descartar quema autorizada o foco de calor industrial."]);
+      hay(f0.mw) ? " · " + fmt(Math.round(f0.mw)) + " MW" : "", f0.veces > 1 ? " · visto en " + f0.veces + " imágenes" : "",
+      fo.lista.length > 1 ? " · " + fo.lista.length + " a 50 km" : "", ". Detección satelital: no se puede descartar quema autorizada o foco de calor industrial."]);
   }
   var hu = d.humo;
-  if (!hu) linea("Humo: sin dato reciente");
-  else linea(hu.fraccion > 0 ? "Humo detectado" + (hay(hu.km) ? ", el más cercano a " + Math.round(hu.km) + " km" : "") + "." : "Sin humo detectado a 50 km");
+  if (!op.sinHumo) {
+    if (!hu) linea("Humo: sin dato reciente");
+    else linea(hu.fraccion > 0 ? "Humo detectado" + (hay(hu.km) ? ", el más cercano a " + Math.round(hu.km) + " km" : "") + "." : "Sin humo detectado a 50 km");
+  }
   sec.appendChild(el("ul", { "class": "radar-lineas" }, lineas));
   sec.appendChild(el("p", { "class": "f-pie" }, [(d.fuentes || "VPS") + (d.revisado ? " · revisado " + dosHoras(d.revisado) : "") + ".",
     viejo !== null && viejo > 15 ? el("b", { "class": "nivel nivel-amarillo", text: " Dato de hace " + viejo + " min." }) : ""]));
@@ -2462,16 +2512,110 @@ function bandaDelLugar() {
   if (viejo !== null && viejo > ALERTAS_VIEJAS_MIN) b.appendChild(el("p", { "class": "nota", style: "margin:6px 0 0", text: "Dato viejo: las alertas se revisaron hace " + viejo + " min." }));
   return b;
 }
-// Tormenta, rayos, radar, focos y humo alrededor de La Población (VPS, cerca.json). Solo de ese punto: se muestra
-// siempre, y dice a cuántos km queda del lugar elegido (usuario, 13/11). Se pide como mucho cada 5 minutos.
-var CERCA = "https://datos.entresijo.org/cerca.json", cercaLeida = { datos: null, en: 0 };
-function pedirCerca() {
-  if (cercaLeida.datos && Date.now() - cercaLeida.en < 5 * 60000) return Promise.resolve(cercaLeida.datos);
-  return pedir(CERCA).then(function (d) { cercaLeida = { datos: d, en: Date.now() }; return d; }).catch(function () { return cercaLeida.datos; });
+// Tormenta, rayos y focos alrededor del lugar elegido, de todo el país (VPS, 15/11). Radar y humo, solo alrededor
+// de La Población (cerca.json): los radares del OHMC cubren el centro del país. Todo estático en datos.entresijo.org,
+// en baldosas de 2°: se baja solo lo que toca el círculo. Se pide como mucho cada 5 minutos.
+var DATOS_VPS = "https://datos.entresijo.org/", RADIO_RADAR = 50;
+var radarLeido = { cerca: null, indice: null, focos: null, rayos: {}, base: {}, en: 0, lugar: "" };
+function baldosasDe(lat, lon, km) {
+  var dLat = km / 111, dLon = km / (111 * Math.max(Math.cos(lat * Math.PI / 180), 0.2)), out = {};
+  [lat - dLat, lat + dLat].forEach(function (a) { [lon - dLon, lon + dLon].forEach(function (o) { out[Math.floor(a / 2) * 2 + "_" + Math.floor(o / 2) * 2] = 1; }); });
+  return Object.keys(out);
 }
-function ponerCerca(d) {
-  var c = d && d.centro, l = UI.lugar;
-  UI.cerca = { datos: d || { fuentes: "No se pudo consultar el radar" }, km: c && l ? distanciaKm(l.lat, l.lon, c.lat, c.lon) : null };
+// Distancia y rumbo en el plano (a 50 km la diferencia con la esfera es de metros).
+function relativo(lat0, lon0, lat, lon) {
+  var dy = (lat - lat0) * 111.2, dx = (lon - lon0) * 111.2 * Math.cos(lat0 * Math.PI / 180);
+  return { dx: dx, dy: dy, km: Math.sqrt(dx * dx + dy * dy), rumbo: (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360 };
+}
+function desdeKmRumbo(lat0, lon0, km, g) {
+  var a = g * Math.PI / 180;
+  return { lat: lat0 + km * Math.cos(a) / 111.2, lon: lon0 + km * Math.sin(a) / (111.2 * Math.cos(lat0 * Math.PI / 180)) };
+}
+function pedirRadar(lugar) {
+  var clave = lugar.lat + "," + lugar.lon;
+  if (radarLeido.en && radarLeido.lugar === clave && Date.now() - radarLeido.en < 5 * 60000) return Promise.resolve();
+  var bald = baldosasDe(lugar.lat, lugar.lon, RADIO_RADAR + 10);
+  function suave(p) { return p.catch(function () { return null; }); }
+  return Promise.all([suave(pedir(DATOS_VPS + "cerca.json")), suave(pedir(DATOS_VPS + "rayos/indice.json")), suave(pedir(DATOS_VPS + "focos_pais.json"))].concat(
+    bald.map(function (k) { return radarLeido.base[k] ? Promise.resolve(radarLeido.base[k]) : suave(pedir(DATOS_VPS + "base/" + k + ".json")); }))).then(function (r) {
+    radarLeido.cerca = r[0] || radarLeido.cerca; radarLeido.indice = r[1]; radarLeido.focos = r[2] || radarLeido.focos;
+    bald.forEach(function (k, i) { if (r[3 + i]) radarLeido.base[k] = r[3 + i]; });
+    // Solo las baldosas del índice tienen rayos: las demás darían 404.
+    var con = r[1] ? bald.filter(function (k) { return (r[1].baldosas || []).indexOf(k) >= 0; }) : [];
+    var nuevos = {};
+    return Promise.all(con.map(function (k) { return suave(pedir(DATOS_VPS + "rayos/" + k + ".json")).then(function (x) { if (x) nuevos[k] = x; }); })).then(function () {
+      radarLeido.rayos = nuevos; radarLeido.baldosas = bald; radarLeido.en = Date.now(); radarLeido.lugar = clave;
+    });
+  });
+}
+var NIVEL_ESTADO = { sin_tormenta: null, acercandose: "amarillo", cerca: "naranja", en_zona: "rojo" };
+function armarRadar(lugar) {
+  var R = RADIO_RADAR, X = radarLeido, cer = X.cerca, lp = cer && cer.centro, ahora = Date.now();
+  var dLP = lp ? relativo(lugar.lat, lugar.lon, lp.lat, lp.lon).km : null, esLP = dLP !== null && dLP <= 5;
+  function rel(lat, lon) { return relativo(lugar.lat, lugar.lon, lat, lon); }
+  var datos = { centro: { nombre: String(lugar.nombre).split(",")[0], lat: lugar.lat, lon: lugar.lon },
+    revisado: (X.indice && X.indice.revisado) || (cer && cer.revisado) || null,
+    fuentes: "Rayos y focos: GOES-19 (NOAA)" + (dLP !== null && dLP <= 90 ? " · radar: OHMC" : "") + " · base: IGN (CC BY 4.0) · Natural Earth" };
+  // Rayos: la última hora para el dibujo fijo; todas las horas, por tramo, para la animación.
+  var porTramo = {}, hora = [];
+  Object.keys(X.rayos).forEach(function (k) {
+    (X.rayos[k].tramos || []).forEach(function (tr) {
+      porTramo[tr.t] = porTramo[tr.t] || [];
+      (tr.celdas || []).forEach(function (c) {
+        var p = rel(c[0], c[1]);
+        if (p.km > R) return;
+        var r = { km: p.km, rumbo: p.rumbo, n: c[2], hora: tr.t };
+        porTramo[tr.t].push(r);
+        if (ahora - new Date(tr.t).getTime() <= 60 * 60000) hora.push(r);
+      });
+    });
+  });
+  datos.rayos = X.indice ? { hora: X.indice.revisado, lista: hora } : null;
+  var cuadros = Object.keys(porTramo).sort().map(function (t) { return { t: t, lista: porTramo[t] }; });
+  // Tormenta: en La Población, la del VPS, que es la misma regla del aviso al teléfono. En otro lugar, esa regla
+  // con los rayos: 3 o más a 50 km en 15 min (los dos últimos tramos), o uno a 20 km o menos, o a 10.
+  if (esLP) datos.tormenta = cer.tormenta;
+  else if (X.indice) {
+    var rec = hora.filter(function (r) { return ahora - new Date(r.hora).getTime() <= 20 * 60000; });
+    var n = rec.reduce(function (s, r) { return s + (r.n || 1); }, 0), c0 = rec.slice().sort(function (a, b) { return a.km - b.km; })[0];
+    var e = !c0 ? "sin_tormenta" : c0.km <= 10 ? "en_zona" : c0.km <= 20 ? "cerca" : n >= 3 ? "acercandose" : "sin_tormenta";
+    datos.tormenta = { estado: e, nivel: NIVEL_ESTADO[e], km: e === "sin_tormenta" ? null : c0.km, rumbo: e === "sin_tormenta" ? null : c0.rumbo, origen: "rayos" };
+  } else datos.tormenta = null;
+  // Núcleos del radar: vienen desde La Población y se pasan al lugar elegido, si está a 90 km o menos.
+  var op = { radioKm: R, cuadros: cuadros, sinHumo: !esLP };
+  if (!cer || dLP > 90) op.notaRadar = "Radar: solo alrededor de La Población (OHMC)";
+  else if (cer.nucleos) {
+    function mover(q) { var g = desdeKmRumbo(lp.lat, lp.lon, q.km, q.rumbo), p = rel(g.lat, g.lon); return { km: p.km, rumbo: p.rumbo, hora: q.hora }; }
+    datos.nucleos = { hora: cer.nucleos.hora, lista: (cer.nucleos.lista || []).map(function (q) {
+      var m = mover(q); return { radar: q.radar, km: m.km, rumbo: m.rumbo, dbz: q.dbz, radares: q.radares, hora: q.hora, trayecto: (q.trayecto || []).map(mover) };
+    }) };
+  } else datos.nucleos = null;
+  if (esLP) datos.humo = cer.humo;
+  // Focos de todo el país a 50 km del lugar. En La Población, el nivel del VPS (incluye el riesgo de incendio).
+  if (X.focos) {
+    var fl = (X.focos.focos || []).map(function (f) { var p = rel(f.lat, f.lon); return { km: p.km, rumbo: p.rumbo, mw: f.mw, hora: f.ultima, veces: f.veces }; })
+      .filter(function (f) { return f.km <= R; }).sort(function (a, b) { return a.km - b.km; });
+    datos.focos = { hora: X.focos.imagen, lista: fl, nivel: esLP && cer.focos ? cer.focos.nivel : fl.length ? nivelFoco(fl[0].km, null) : null };
+  } else datos.focos = null;
+  // La base: rutas y ríos que pasan por el círculo, y localidades adentro, en km desde el centro.
+  var base = { rutas: [], rios: [], localidades: [] }, vistas = {};
+  (X.baldosas || []).forEach(function (k) {
+    var bb = X.base[k]; if (!bb) return;
+    ["rutas", "rios"].forEach(function (tipo) {
+      (bb[tipo] || []).forEach(function (ln) {
+        var pts = (ln.p || []).map(function (q) { var p = rel(q[0], q[1]); return [p.dx, p.dy, p.km]; });
+        if (pts.some(function (q) { return q[2] <= R * 1.1; })) base[tipo].push(pts.map(function (q) { return [q[0], q[1]]; }));
+      });
+    });
+    (bb.localidades || []).forEach(function (l) {
+      if (vistas[l.n + l.lat]) return; vistas[l.n + l.lat] = 1;
+      var p = rel(l.lat, l.lon); if (p.km <= R) base.localidades.push({ n: l.n, dx: p.dx, dy: p.dy, pob: l.pob, km: p.km });
+    });
+  });
+  // Primero las ciudades grandes; después, las más cercanas.
+  base.localidades.sort(function (a, b) { return (b.pob ? 1 : 0) - (a.pob ? 1 : 0) || a.km - b.km; });
+  op.base = base;
+  return { datos: datos, op: op };
 }
 function pieAlertas() {
   var d = alertasLeidas.datos;
@@ -2567,8 +2711,8 @@ function cargar(lugar) {
     hourly: "temperature_2m,relative_humidity_2m,dew_point_2m,precipitation_probability,precipitation,cloud_cover,wind_speed_10m,wind_gusts_10m,uv_index,visibility,cape,freezing_level_height,soil_temperature_0cm",
     daily: "sunrise,sunset" });
   var aire = AIRE + parametros({ latitude: lugar.lat, longitude: lugar.lon, timezone: "auto", current: "pm2_5,us_aqi" });
-  return Promise.all([pedir(pron), pedir(aire).catch(function () { return null; }), estacionCerca(lugar), pedirAlertas(), pedirCerca()]).then(function (r) {
-    ponerCerca(r[4]);
+  return Promise.all([pedir(pron), pedir(aire).catch(function () { return null; }), estacionCerca(lugar), pedirAlertas(), pedirRadar(lugar).catch(function () { return null; })]).then(function (r) {
+    UI.cerca = armarRadar(lugar);
     UI.loc = lugar.nombre; UI.locVivo = aVivo(r[0], r[1]); UI.estacion = r[2]; capturadoEn = Date.now(); aLectura(UI.locVivo);
     try { localStorage.setItem("clima-lugar", JSON.stringify(lugar)); } catch (e) { /* solo es comodidad */ }
     // Un error al dibujar no es falta de conexión: se dice distinto y queda en la consola.
