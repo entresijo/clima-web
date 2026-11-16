@@ -605,7 +605,8 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 .radar-ley { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; font-size: 13px; color: var(--tinta3); margin-top: 6px; }
 .radar-ley i { display: inline-block; vertical-align: middle; margin-right: 5px; }
 .ley-rayo { width: 6px; height: 11px; background: linear-gradient(115deg, transparent 42%, var(--n-amarillo) 42%, var(--n-amarillo) 58%, transparent 58%); }
-.ley-rayo-v { width: 6px; height: 6px; border-radius: 50%; background: var(--tinta2); opacity: .7; }
+.ley-rayo.ley-rayo-v { background: linear-gradient(115deg, transparent 42%, var(--tinta2) 42%, var(--tinta2) 58%, transparent 58%); opacity: .7; }
+.radar-barra { display: block; width: 100%; max-width: 420px; margin: 8px auto 0; accent-color: var(--acento); min-height: 32px; }
 .ley-nucleo { width: 10px; height: 10px; border-radius: 50%; border: 1.6px solid var(--tinta); }
 .ley-foco { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 9px solid var(--n-naranja); }
 .radar-anima { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 8px; }
@@ -2271,8 +2272,10 @@ function radarEsquema(datos, op) {
   var b = op.base, gb = svg("g", { "clip-path": "url(#radar-circulo)" });
   if (b) {
     function linea_(pts, attrs) { if (pts.length > 1) gb.appendChild(svg("path", Object.assign({ d: pts.map(function (p, i) { var q = XYd(p[0], p[1]); return (i ? "L" : "M") + q[0].toFixed(1) + " " + q[1].toFixed(1); }).join(""), fill: "none" }, attrs))); }
-    (b.rios || []).forEach(function (p) { linea_(p, { stroke: "var(--pron)", "stroke-width": 0.8, opacity: 0.3 }); });
-    (b.rutas || []).forEach(function (p) { linea_(p, { stroke: "var(--tinta3)", "stroke-width": 0.8, opacity: 0.35 }); });
+    // Ríos en azul, muy sutiles; rutas en gris: las provinciales finas, las nacionales apenas más marcadas.
+    (b.rios || []).forEach(function (p) { linea_(p, { stroke: "var(--acento)", "stroke-width": 0.6, opacity: 0.22 }); });
+    (b.rutasProv || []).forEach(function (p) { linea_(p, { stroke: "var(--tinta2)", "stroke-width": 0.6, opacity: 0.28 }); });
+    (b.rutas || []).forEach(function (p) { linea_(p, { stroke: "var(--tinta2)", "stroke-width": 1, opacity: 0.5 }); });
     var puestas = [];
     (b.localidades || []).forEach(function (l) {
       var km = Math.sqrt(l.dx * l.dx + l.dy * l.dy);
@@ -2315,20 +2318,20 @@ function radarEsquema(datos, op) {
   });
   // Rayos: cruces chicas, más grandes cuantos más hay en la celda, que se apagan con la antigüedad.
   var gR = svg("g", {});
-  // Como los mapas de rayos (Blitzortung, LightningMaps): puntos chicos, no una grilla. El tamaño dice cuántos
-  // hubo en la celda; lo viejo se apaga. Solo lo de los últimos 20 min lleva la marca de rayo, y como mucho 10.
+  // Todos son rayos, con la misma marca (usuario, 16/11): los de los últimos 20 min, en amarillo; los anteriores,
+  // más chicos y tenues. El tamaño dice cuántos hubo en la celda. Corridos dentro de su celda (5 km), para
+  // que no se lea como cuadrícula. Los viejos se dibujan primero: los nuevos quedan arriba.
   function pintarRayos(lista, fija) {
     vaciar(gR);
-    var l = (lista || []).filter(function (r) { return r.km <= R; });
-    var frescos = l.filter(function (r) { var m = minDesde(r.hora); return fija || (m !== null && m <= 20); }).sort(function (a, b) { return (b.n || 1) - (a.n || 1); }).slice(0, 10);
-    l.forEach(function (r, k) {
-      // Un corrimiento fijo dentro de la celda (5 km), para que no se lea como cuadrícula.
-      var h = Math.sin((r.km * 12.9898 + r.rumbo * 78.233) * 43758.5453), h2 = Math.sin((r.km * 39.346 + r.rumbo * 11.135) * 24634.6345);
-      var p = XY(r.km, r.rumbo); p = [p[0] + h * 2 * K, p[1] + h2 * 2 * K];
-      var m = minDesde(r.hora), o = fija ? 0.9 : m === null ? 0.5 : Math.max(0.18, 0.85 - m / 75);
-      if (frescos.indexOf(r) >= 0) {
-        gR.appendChild(svg("path", { d: "M" + (p[0] + 1.5) + " " + (p[1] - 6) + "l-4 6.5h4l-2.5 5.5", fill: "none", stroke: "var(--n-amarillo)", "stroke-width": 1.5, "stroke-linecap": "round", "stroke-linejoin": "round" }));
-      } else gR.appendChild(svg("circle", { cx: p[0], cy: p[1], r: (r.n ? 0.9 + Math.min(1.8, Math.log(r.n) / Math.LN2 * 0.45) : 1.6).toFixed(1), fill: "var(--tinta2)", opacity: o.toFixed(2) }));
+    var l = (lista || []).filter(function (r) { return r.km <= R; }).map(function (r) { var m = minDesde(r.hora); return { r: r, m: m, nuevo: fija || (m !== null && m <= 20) }; });
+    l.sort(function (a, b) { return (a.nuevo ? 1 : 0) - (b.nuevo ? 1 : 0); });
+    l.forEach(function (x) {
+      var r = x.r, h = Math.sin((r.km * 12.9898 + r.rumbo * 78.233) * 43758.5453), h2 = Math.sin((r.km * 39.346 + r.rumbo * 11.135) * 24634.6345);
+      var p = XY(r.km, r.rumbo), e = (x.nuevo ? 0.75 : 0.5) + Math.min(0.45, Math.log(r.n || 1) / Math.LN2 * 0.1);
+      p = [p[0] + h * 2 * K, p[1] + h2 * 2 * K];
+      gR.appendChild(svg("path", { d: "M" + (p[0] + 1.5 * e).toFixed(1) + " " + (p[1] - 6 * e).toFixed(1) + "l" + (-4 * e).toFixed(1) + " " + (6.5 * e).toFixed(1) + "h" + (4 * e).toFixed(1) + "l" + (-2.5 * e).toFixed(1) + " " + (5.5 * e).toFixed(1),
+        fill: "none", stroke: x.nuevo ? "var(--n-amarillo)" : "var(--tinta2)", "stroke-width": x.nuevo ? 1.5 : 1, "stroke-linecap": "round", "stroke-linejoin": "round",
+        opacity: x.nuevo ? 1 : Math.max(0.25, 0.7 - (x.m || 0) / 110).toFixed(2) }));
     });
   }
   var ra = d.rayos;
@@ -2341,18 +2344,31 @@ function radarEsquema(datos, op) {
   // Solo si en esas horas hubo rayos dentro del círculo.
   if (cu.length > 1 && cu.some(function (q) { return q.lista.length; })) {
     var hs_ = Math.max(1, Math.round((Date.now() - new Date(cu[0].t).getTime()) / 3600000)), rotulo_ = hs_ === 1 ? "Ver la última hora" : "Ver las últimas " + hs_ + " h";
-    var hora_ = el("span", { "class": "radar-hora din" }), reloj_ = null, k_ = 0;
+    var hora_ = el("span", { "class": "radar-hora din" }), reloj_ = null, k_ = cu.length;
     var boton = el("button", { "class": "boton", "aria-pressed": "false" }, rotulo_);
-    function parar() { clearInterval(reloj_); reloj_ = null; boton.textContent = rotulo_; boton.setAttribute("aria-pressed", "false"); hora_.textContent = ""; pintarRayos(ra && ra.lista); }
+    // La barra: cada paso es un tramo de 10 minutos; el último, la vista de siempre (la última hora).
+    var barra = el("input", { type: "range", min: 0, max: cu.length, step: 1, "class": "radar-barra", "aria-label": "Hora de los rayos" });
+    barra.value = cu.length;
+    function mostrar(k) {
+      k_ = k; barra.value = k;
+      if (k >= cu.length) { hora_.textContent = ""; pintarRayos(ra && ra.lista); return; }
+      pintarRayos(cu[k].lista, true);
+      hora_.textContent = dosHoras(cu[k].t) + " · " + (cu[k].lista.length ? cu[k].lista.reduce(function (s_, r) { return s_ + (r.n || 1); }, 0) + " rayos" : "sin rayos");
+    }
+    function parar() { clearInterval(reloj_); reloj_ = null; boton.textContent = rotulo_; boton.setAttribute("aria-pressed", "false"); }
     boton.addEventListener("click", function () {
       if (reloj_) { parar(); return; }
-      k_ = 0; boton.textContent = "Detener"; boton.setAttribute("aria-pressed", "true");
+      boton.textContent = "Detener"; boton.setAttribute("aria-pressed", "true");
+      var k = k_ >= cu.length ? 0 : k_;
       reloj_ = setInterval(function () {
-        if (k_ >= cu.length || !boton.isConnected) { parar(); return; }
-        pintarRayos(cu[k_].lista, true); hora_.textContent = dosHoras(cu[k_].t) + " · " + (cu[k_].lista.length ? cu[k_].lista.reduce(function (s_, r) { return s_ + (r.n || 1); }, 0) + " rayos" : "sin rayos"); k_++;
+        if (!boton.isConnected) { clearInterval(reloj_); return; }
+        mostrar(k); k++;
+        if (k > cu.length) parar();
       }, 450);
     });
+    barra.addEventListener("input", function () { if (reloj_) parar(); mostrar(parseInt(barra.value, 10)); });
     sec.appendChild(el("div", { "class": "radar-anima" }, [boton, hora_]));
+    sec.appendChild(barra);
   }
   // El enganche del panel LAN: su capa va debajo del dibujo, con la misma escala.
   if (typeof op.fondo === "function") {
@@ -2361,7 +2377,7 @@ function radarEsquema(datos, op) {
     if (window.ResizeObserver) new ResizeObserver(pedir_).observe(marco);
   }
   sec.appendChild(el("div", { "class": "radar-ley" }, [
-    el("span", {}, [el("i", { "class": "ley-rayo" }), "rayos, últimos 20 min"]), el("span", {}, [el("i", { "class": "ley-rayo-v" }), "última hora"]), el("span", {}, [el("i", { "class": "ley-nucleo" }), "núcleo de radar"]),
+    el("span", {}, [el("i", { "class": "ley-rayo" }), "rayos de los últimos 20 min"]), el("span", {}, [el("i", { "class": "ley-rayo ley-rayo-v" }), "rayos anteriores"]), el("span", {}, [el("i", { "class": "ley-nucleo" }), "núcleo de radar"]),
     el("span", {}, [el("i", { "class": "ley-foco" }), "foco de calor"])]));
   // Una línea por parte: qué hay, o que no hay nada, o que el dato está viejo.
   var lineas = [];
@@ -2606,14 +2622,13 @@ function armarRadar(lugar) {
     datos.focos = { hora: X.focos.imagen, lista: fl, nivel: esLP && cer.focos ? cer.focos.nivel : fl.length ? nivelFoco(fl[0].km, null) : null };
   } else datos.focos = null;
   // La base: rutas y ríos que pasan por el círculo, y localidades adentro, en km desde el centro.
-  var base = { rutas: [], rios: [], localidades: [] }, vistas = {};
+  var base = { rutas: [], rutasProv: [], rios: [], localidades: [] }, vistas = {};
   (X.baldosas || []).forEach(function (k) {
     var bb = X.base[k]; if (!bb) return;
     ["rutas", "rios"].forEach(function (tipo) {
       (bb[tipo] || []).forEach(function (ln) {
-        if (tipo === "rutas" && !/^RN/.test(String(ln.n || ""))) return;   // un escalón menos: sin rutas provinciales (usuario, 16/11)
         var pts = (ln.p || []).map(function (q) { var p = rel(q[0], q[1]); return [p.dx, p.dy, p.km]; });
-        if (pts.some(function (q) { return q[2] <= R * 1.1; })) base[tipo].push(pts.map(function (q) { return [q[0], q[1]]; }));
+        if (pts.some(function (q) { return q[2] <= R * 1.1; })) base[tipo === "rutas" && !/^RN/.test(String(ln.n || "")) ? "rutasProv" : tipo].push(pts.map(function (q) { return [q[0], q[1]]; }));
       });
     });
     (bb.localidades || []).forEach(function (l) {
