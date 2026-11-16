@@ -2272,8 +2272,8 @@ function radarEsquema(datos, op) {
   var b = op.base, gb = svg("g", { "clip-path": "url(#radar-circulo)" });
   if (b) {
     function linea_(pts, attrs) { if (pts.length > 1) gb.appendChild(svg("path", Object.assign({ d: pts.map(function (p, i) { var q = XYd(p[0], p[1]); return (i ? "L" : "M") + q[0].toFixed(1) + " " + q[1].toFixed(1); }).join(""), fill: "none" }, attrs))); }
-    // Ríos en azul, muy sutiles; rutas en gris: las provinciales finas, las nacionales apenas más marcadas.
-    (b.rios || []).forEach(function (p) { linea_(p, { stroke: "var(--acento)", "stroke-width": 0.6, opacity: 0.22 }); });
+    // Ríos en azul franco, finos; rutas en gris: las provinciales finas, las nacionales apenas más marcadas.
+    (b.rios || []).forEach(function (p) { linea_(p, { stroke: "var(--f-ohmc)", "stroke-width": 0.7, opacity: 0.5 }); });
     (b.rutasProv || []).forEach(function (p) { linea_(p, { stroke: "var(--tinta2)", "stroke-width": 0.6, opacity: 0.28 }); });
     (b.rutas || []).forEach(function (p) { linea_(p, { stroke: "var(--tinta2)", "stroke-width": 1, opacity: 0.5 }); });
     var puestas = [];
