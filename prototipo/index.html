@@ -620,7 +620,21 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 .mini-v { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .mini-c { font-size: 13px; color: var(--tinta3); line-height: 1.15; }
 
-.radar-esq { grid-column: span 2; }
+.dias-3 { display: grid; grid-template-columns: minmax(230px, 1fr) minmax(0, 2.6fr) minmax(250px, 1fr); gap: 12px; align-items: start; margin-bottom: 12px; }
+.dia-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.dia-col > * { order: 0 !important; grid-column: auto; }
+@media (max-width: 1099px) { .dias-3 { grid-template-columns: 1fr 1fr; } .dia-hoy { grid-column: 1 / -1; order: -1; } }
+
+@media (min-width: 1360px) {
+  .dia-hoy .radar-esq { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 0 24px; align-items: start; }
+  .dia-hoy .radar-cab { grid-column: 1 / -1; }
+  .dia-hoy .radar-marco { grid-column: 1; grid-row: 2; margin: 10px 0 0; max-width: none; }
+  .dia-hoy .radar-anima { grid-column: 1; grid-row: 3; }
+  .dia-hoy .radar-barra { grid-column: 1; grid-row: 4; max-width: none; }
+  .dia-hoy .radar-ley { grid-column: 1; grid-row: 5; justify-content: flex-start; }
+  .dia-hoy .radar-lineas { grid-column: 2; grid-row: 2 / span 3; margin-top: 10px; padding-top: 0; border-top: 0; font-size: 15px; gap: 10px; }
+  .dia-hoy .radar-esq > .f-pie { grid-column: 2; grid-row: 5; align-self: end; margin: 0; }
+}
 @media (max-width: 1280px) { .radar-esq { order: 2; } }
 @media (max-width: 1040px) { .radar-esq { grid-column: auto; } }
 .radar-esq.primero { order: 0 !important; }
@@ -1943,7 +1957,13 @@ function tableroDias(v, ahora, viene) {
       ["hoy", "Hoy", ahoraHoy.concat([panelFranjas({ desde: 0, hasta: 2, fijo: true, titulo: "PRONÓSTICO POR FRANJAS" })])],
       ["proximos", "Próximos", [viene, panelFranjas({ desde: 1, hasta: 5, fijo: true, titulo: "POR FRANJAS" })]]]));
   } else {
-    v.appendChild(el("div", { "class": "hoy-grid" }, [bloqueAyer()].concat(ahoraHoy, [viene, panelFranjas()])));
+    // Pantalla ancha: el eje del tiempo de izquierda a derecha, Ayer | Hoy | Próximos. Todo lo de hoy, radar
+    // incluido, va en la columna del medio. El pronóstico por franjas, que se abre y se cierra, va debajo, a todo el ancho.
+    v.appendChild(el("div", { "class": "dias-3" }, [
+      el("div", { "class": "dia-col dia-ayer" }, [bloqueAyer()]),
+      el("div", { "class": "dia-col dia-hoy" }, ahoraHoy),
+      el("div", { "class": "dia-col dia-prox" }, [viene])]));
+    v.appendChild(panelFranjas());
   }
 }
 function datosAhora() {
@@ -2145,7 +2165,8 @@ function bloqueVariante(v, movil) {
   var A = datosAhora(), horas = horasQueVienen(), x = datosHoy();
   var sec = el("section", { "class": "hoja bloque bloque-ahora bloque-junto v-" + v, "aria-label": "Ahora y lo que queda del día" }, [cabeceraAhora(A), lineaDiferencia(A)]);
   if (v === "F") {
-    sec = el("section", { "class": "hoja bloque bloque-ahora bloque-junto v-F", "aria-label": "Ahora y lo que queda del día" }, [cabeceraF(A, horas), tiraCurva(A, horas), recuadrosF(A, horas, x), pieF(A)]);
+    var fechaHoy = new Date(vivoV().capturado).toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
+    sec = el("section", { "class": "hoja bloque bloque-ahora bloque-junto v-F", "aria-label": "Ahora y lo que queda del día" }, [movil ? null : el("p", { "class": "bloque-eti" }, ["HOY ", el("span", { text: "· " + fechaHoy })]), cabeceraF(A, horas), tiraCurva(A, horas), recuadrosF(A, horas, x), pieF(A)]);
     if (!movil) sec.appendChild(el("div", { "class": "ah-pie" }, botonFranjas()));
     return sec;
   }
