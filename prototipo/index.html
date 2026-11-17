@@ -621,6 +621,30 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 .mini-c { font-size: 13px; color: var(--tinta3); line-height: 1.15; }
 
 .hoy-grid > .radar-esq { grid-column: span 2; }
+@media (min-width: 1281px) { .hoy-grid > .radar-esq { grid-column: 2 / span 2; } .hoy-grid > .radar-esq.primero { grid-column: 1 / -1; } }
+
+.caja-tiempo { margin-bottom: 12px; }
+.th-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.th-cab .bloque-eti { margin: 0; }
+.caja-tiempo .franjas-panel { border: 0; background: none; padding: 0; margin-top: 10px; }
+.caja-tiempo .franjas-panel > .bloque-eti { display: none; }
+.tc-pasado { opacity: .55; }
+.tiles-h { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 8px; margin-top: 14px; }
+.tile-h { background: var(--hoja2); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.tile-h > svg { color: var(--tinta2); }
+.tile-h .tile-v { font-size: 22px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tile-h .tile-c { font-size: 13px; color: var(--tinta2); line-height: 1.25; }
+.tile-h.mayor { grid-column: span 2; }
+.tile-h.mayor .tile-v { font-size: 30px; }
+.tile-h.nv-lluvia > svg { color: var(--acento); }
+.tile-h.nv-amarillo > svg { color: var(--n-amarillo); }
+.tile-h.nv-naranja > svg { color: var(--n-naranja); }
+.tile-h.nv-rojo > svg { color: var(--n-rojo); }
+.tile-h.nv-violeta > svg { color: var(--n-violeta); }
+.fila-h { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 12px; align-items: start; margin-bottom: 12px; }
+.fila-h.solo { grid-template-columns: 1fr; }
+.fila-h > .radar-esq { grid-column: auto; }
+@media (max-width: 899px) { .fila-h { grid-template-columns: 1fr; } }
 .franjas.t thead th { text-align: center; font-size: 12px; padding: 4px 1px; white-space: nowrap; }
 @media (max-width: 720px) { .franjas.t thead th { font-size: 13px; } }
 .dia-ayer .franjas.t thead th:first-child, .dia-ayer .franjas.t tbody th { display: none; }
@@ -1966,20 +1990,24 @@ function tableroDias(v, ahora, viene) {
   // G (tres columnas): las franjas están siempre a la vista. A y F, como antes: con el botón de abrirlas.
   var G = varianteActual() === "G";
   if (A) { var s = ahora(); s.classList.add("bloque-junto"); s.appendChild(franjaHoy({ sinBoton: movil })); ahoraHoy = [s]; }
-  else ahoraHoy = [bloqueVariante(varianteActual(), movil, G)];
+  else ahoraHoy = varianteActual() === "H" ? [] : [bloqueVariante(varianteActual(), movil, G)];
   // El radar del VPS, cuando la cáscara lo trae (la pública lo pide; el panel LAN tiene su bloque propio).
   var radar = UI.cerca ? radarEsquema(UI.cerca.datos, UI.cerca.op) : null;
   var nivR = UI.cerca && UI.cerca.datos.tormenta && UI.cerca.datos.tormenta.nivel;
   if (radar && (nivR === "rojo" || nivR === "naranja")) { radar.classList.add("primero"); ahoraHoy = [radar].concat(ahoraHoy); }
   else if (radar) ahoraHoy = ahoraHoy.concat([radar]);
   v.appendChild(selectorVariante());
+  // H: una sola caja de ayer a mañana; abajo, radar y próximos días. Sin pestañas, en el celular también.
+  if (varianteActual() === "H") { tableroH(v, viene, radar, nivR === "rojo" || nivR === "naranja"); return; }
   if (movil) {
     v.appendChild(pestanas([
       ["ayer", "Ayer", [bloqueAyer(), panelFranjas({ desde: -1, hasta: 0, fijo: true, titulo: "AYER, POR FRANJAS", transpuesta: G })]],
       ["hoy", "Hoy", ahoraHoy.concat([panelFranjas({ desde: 0, hasta: 2, fijo: true, titulo: "PRONÓSTICO POR FRANJAS", transpuesta: G })])],
       ["proximos", "Próximos", [viene, panelFranjas({ desde: 1, hasta: 5, fijo: true, titulo: "POR FRANJAS", transpuesta: G })]]]));
   } else if (!G) {
-    v.appendChild(el("div", { "class": "hoy-grid" }, [bloqueAyer()].concat(ahoraHoy, [viene, panelFranjas()])));
+    // El radar va después de Próximos, para que esa columna no baje; con tormenta cerca va primero, a todo el ancho.
+    var sinRadar = ahoraHoy.filter(function (n) { return n !== radar; }), radarPrimero = radar && radar.classList.contains("primero");
+    v.appendChild(el("div", { "class": "hoy-grid" }, (radarPrimero ? [radar] : []).concat([bloqueAyer()], sinRadar, [viene], radar && !radarPrimero ? [radar] : [], [panelFranjas()])));
   } else {
     // Pantalla ancha: el eje del tiempo de izquierda a derecha, Ayer | Hoy | Próximos. Cada columna lleva lo
     // mismo que su pestaña del celular. Todo lo de hoy, radar incluido, va en la columna del medio.
@@ -2225,26 +2253,29 @@ function colorTemp(v) {
   var c = colorDe(colorDe("frio", v) ? "frio" : "calor", v);
   return c ? "var(--n-" + c + ")" : "";
 }
-function tiraCurva(A, horas) {
+function tiraCurva(A, horas, op) {
+  op = op || {};
   var ANCHO = 56, ZONA = 64, ARRIBA = 58;
   var h0 = new Date(vivoV().capturado).getHours();
-  var cols = [{ ahora: true, h: h0, temp: hay(A.temp) ? A.temp : (horas[0] || {}).temp, icono: A.icono, prob: null, mm: 0 }].concat(horas.map(function (z) {
+  var cols = (op.cols || [{ ahora: true, h: h0, temp: hay(A.temp) ? A.temp : (horas[0] || {}).temp, icono: A.icono, prob: null, mm: 0 }].concat(horas.map(function (z) {
     return { t: z.t, h: z.h, temp: z.temp, icono: iconoHora(z), prob: z.prob, mm: z.mm };
-  })).filter(function (c) { return hay(c.temp); });
+  }))).filter(function (c) { return hay(c.temp); });
   if (cols.length < 2) return null;
+  var i0 = Math.max(0, cols.map(function (c) { return !!c.ahora; }).indexOf(true));
   var ts = cols.map(function (c) { return Math.round(c.temp); }), mn = Math.min.apply(null, ts), mx = Math.max.apply(null, ts);
   if (mx - mn < 8) { var medio = (mx + mn) / 2; mn = medio - 4; mx = medio + 4; }
   function Y(v) { return 24 + (ZONA - 32) * (1 - (v - mn) / (mx - mn)); }
   var W = cols.length * ANCHO, pts = ts.map(function (v, i) { return [i * ANCHO + ANCHO / 2, Y(v)]; });
   // Curva suave por los puntos (Catmull-Rom a Bézier): pasa por cada número, sin pasarse de largo.
-  var d = "M" + pts[0][0] + " " + pts[0][1].toFixed(1);
+  var segs = [];
   for (var i = 0; i < pts.length - 1; i++) {
     var p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
     var c1y = p1[1] + (p2[1] - p0[1]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
     c1y = Math.min(Math.max(c1y, Math.min(p1[1], p2[1])), Math.max(p1[1], p2[1]));
     c2y = Math.min(Math.max(c2y, Math.min(p1[1], p2[1])), Math.max(p1[1], p2[1]));
-    d += "C" + (p1[0] + ANCHO / 3).toFixed(1) + " " + c1y.toFixed(1) + " " + (p2[0] - ANCHO / 3).toFixed(1) + " " + c2y.toFixed(1) + " " + p2[0] + " " + p2[1].toFixed(1);
+    segs.push("C" + (p1[0] + ANCHO / 3).toFixed(1) + " " + c1y.toFixed(1) + " " + (p2[0] - ANCHO / 3).toFixed(1) + " " + c2y.toFixed(1) + " " + p2[0] + " " + p2[1].toFixed(1));
   }
+  var d = "M" + pts[0][0] + " " + pts[0][1].toFixed(1) + segs.join("");
   var s = svg("svg", { "class": "tc-curva", width: W, height: ZONA, viewBox: "0 0 " + W + " " + ZONA, "aria-hidden": "true", style: "top:" + ARRIBA + "px" });
   // El relleno se desvanece hacia abajo: plano se veía como un bloque.
   var fondo = svg("linearGradient", { id: "tc-fondo", x1: 0, y1: 0, x2: 0, y2: 1 });
@@ -2252,11 +2283,13 @@ function tiraCurva(A, horas) {
   fondo.appendChild(svg("stop", { offset: "1", "stop-color": "var(--tinta3)", "stop-opacity": 0 }));
   var defs = svg("defs", {}); defs.appendChild(fondo); s.appendChild(defs);
   s.appendChild(svg("path", { d: d + "L" + pts[pts.length - 1][0] + " " + ZONA + "L" + pts[0][0] + " " + ZONA + "Z", fill: "url(#tc-fondo)" }));
-  s.appendChild(svg("path", { d: d, fill: "none", stroke: "var(--tinta3)", "stroke-width": 2, "stroke-linecap": "round" }));
+  // Lo anterior a ahora (del modelo, sin medición) va punteado; lo que viene, en línea llena.
+  if (i0 > 0) s.appendChild(svg("path", { d: "M" + pts[0][0] + " " + pts[0][1].toFixed(1) + segs.slice(0, i0).join(""), fill: "none", stroke: "var(--tinta3)", "stroke-width": 1.6, "stroke-dasharray": "4 4", opacity: 0.8, "stroke-linecap": "round" }));
+  s.appendChild(svg("path", { d: "M" + pts[i0][0] + " " + pts[i0][1].toFixed(1) + segs.slice(i0).join(""), fill: "none", stroke: "var(--tinta3)", "stroke-width": 2, "stroke-linecap": "round" }));
   pts.forEach(function (p, k) {
     var ahora = cols[k].ahora;
     s.appendChild(svg("circle", { cx: p[0], cy: p[1], r: ahora ? 4.5 : 2.5, fill: ahora ? "var(--tinta)" : "var(--tinta3)" }));
-    var t = svg("text", { x: p[0], y: p[1] - 10, "text-anchor": "middle", "font-size": ahora ? 17 : 15, "font-weight": 700, fill: colorTemp(ts[k]) || "var(--tinta)" });
+    var t = svg("text", { x: p[0], y: p[1] - 10, "text-anchor": "middle", "font-size": ahora ? 17 : 15, "font-weight": 700, fill: colorTemp(ts[k]) || "var(--tinta)", opacity: cols[k].pasado ? 0.6 : 1 });
     t.textContent = ts[k] + "°"; s.appendChild(t);
   });
   // Sin lluvia en ninguna hora, la fila de la lluvia no ocupa lugar.
@@ -2268,15 +2301,16 @@ function tiraCurva(A, horas) {
     var p = c.prob >= 20 ? c.prob : null, esPico = p !== null && c === pico_ && p >= 30,
         // El numero solo en la hora pico; el resto, la barra. Y los mm solo si se notan (desde 0,3).
         pTxt = esPico ? [marcado("prob", p, p + "%")] : [];
-    if (p !== null && !esPico) pTxt = []; barra = p === null ? null : el("span", { "class": "tc-barra", style: "width:" + Math.max(6, Math.round(36 * p / 100)) + "px;" + (p >= 70 ? "background:var(--n-amarillo)" : "") });
-    interior.appendChild(el("div", { "class": "tc-col" + (noche ? " tc-noche" : "") + (c.ahora ? " tc-ahora" : "") + (cambia ? " tc-dia" : ""), role: "listitem",
+    if (p !== null && !esPico) pTxt = [];
+    var barra = p === null ? null : el("span", { "class": "tc-barra", style: "width:" + Math.max(6, Math.round(36 * p / 100)) + "px;" + (p >= 70 ? "background:var(--n-amarillo)" : "") });
+    interior.appendChild(el("div", { "class": "tc-col" + (noche ? " tc-noche" : "") + (c.ahora ? " tc-ahora" : "") + (cambia ? " tc-dia" : "") + (c.pasado ? " tc-pasado" : ""), role: "listitem",
       "aria-label": (c.ahora ? "Ahora" : c.h + " h") + ": " + ts[cols.indexOf(c)] + "°" + (p !== null ? ", lluvia " + p + " %" : "") }, [
-      el("div", { "class": "tc-h", text: c.ahora ? "Ahora" : cambia ? etiquetaDia({ fecha: fechaDe(new Date(c.t)), desfase: 1 }) : c.h + " h" }),
+      el("div", { "class": "tc-h", text: c.ahora ? "Ahora" : cambia ? (op.cols ? rotuloDiaTira(c.t) : etiquetaDia({ fecha: fechaDe(new Date(c.t)), desfase: 1 })) : c.h + " h" }),
       (function () { var i_ = icono(c.icono, 24); if (c.icono === "lluvia") i_.setAttribute("class", "tc-llueve"); return i_; })(),
       el("div", { "class": "tc-zona" }),
       el("div", { "class": "tc-lluvia" }, p === null ? "" : pTxt.concat([barra, c.mm >= 0.3 ? el("small", { text: fmt(Math.round(c.mm * 10) / 10) }) : ""]))]));
   });
-  var tira = el("div", { "class": "tira-curva", role: "list", "aria-label": "Por hora, hasta las 6 de mañana" }, interior);
+  var tira = el("div", { "class": "tira-curva", role: "list", "aria-label": op.cols ? "Por hora, de ayer a mañana" : "Por hora, hasta las 6 de mañana" }, interior);
   var izq = el("button", { "class": "tira-flecha izq", "aria-label": "Horas anteriores", hidden: true }, "‹"), der = el("button", { "class": "tira-flecha der", "aria-label": "Horas siguientes", hidden: true }, "›");
   var env = el("div", { "class": "tira-env" }, [tira, izq, der]);
   function flechas() { izq.hidden = tira.scrollLeft < 8; der.hidden = tira.scrollLeft + tira.clientWidth > tira.scrollWidth - 8; env.classList.toggle("sigue-der", !der.hidden); env.classList.toggle("sigue-izq", !izq.hidden); }
@@ -2284,6 +2318,8 @@ function tiraCurva(A, horas) {
   der.addEventListener("click", function () { tira.scrollBy({ left: tira.clientWidth * 0.7, behavior: "smooth" }); });
   tira.addEventListener("scroll", flechas, { passive: true });
   setTimeout(flechas, 50); setTimeout(flechas, 600);
+  // En la caja de ayer, hoy y mañana la tira empieza en "ahora", con un poco de lo anterior a la izquierda.
+  if (op.centrar) setTimeout(function () { var a = interior.querySelector(".tc-ahora"); if (a) tira.scrollLeft = Math.max(0, a.offsetLeft - ANCHO * 1.6); flechas(); }, 80);
   return env;
 }
 function recuadro(ic, valor, pie, clase) {
@@ -2320,12 +2356,16 @@ function pieF(A) {
   if (A.med.medido) t += " · lo demás, del modelo";
   return el("p", { "class": "f-pie", text: t + "." });
 }
-function recuadrosF(A, horas, x) {
+function recuadrosF(A, horas, x, op) {
+  op = op || {};
   var V = vivoV(), a = V.actual || {}, d = UI.loc ? {} : (L.datos || {}), q = V.aire || {}, as = V.astro || {};
   var hh = new Date(V.capturado).getHours(), noche = hh >= 18, tramo = horas.filter(function (z) { return noche || z.hoy; });
   var pico = tramo.reduce(function (p, b) { return !p || (b.prob || 0) > (p.prob || 0) ? b : p; }, null), mm = tramo.reduce(function (s_, z) { return s_ + z.mm; }, 0);
   var arriba = [], abajo = [];
-  function dato(atencion, nivel, ic, valor, pie) { (atencion ? arriba : abajo).push({ nivel: nivel, ic: ic, valor: valor, pie: pie }); }
+  function dato(atencion, nivel, ic, valor, pie, peso) {
+    var sc = (peso !== undefined ? peso : (PESOS_IND[ic] || 20)) + (atencion ? 100 : 0) + ({ rojo: 30, naranja: 20, amarillo: 10 }[nivel] || 0);
+    (atencion ? arriba : abajo).push({ nivel: nivel, ic: ic, valor: valor, pie: pie, score: sc });
+  }
   // Reglas de PROPUESTA_DISENO_POR_SITUACION.md (usuario, 16/11): lo que cruza su umbral sube; lo que no tiene
   // nada que decir no ocupa lugar; lo del modelo que contradice a lo medido se oculta.
   var ce = UI.cerca && UI.cerca.datos, tor = ce && ce.tormenta, nivT = tor && tor.nivel, tormentaCerca = nivT === "rojo" || nivT === "naranja";
@@ -2341,7 +2381,7 @@ function recuadrosF(A, horas, x) {
   if (minN && colorDe("frio", minN.temp)) dato(true, colorDe("frio", minN.temp), "termo", marcado("frio", minN.temp, Math.round(minN.temp) + "°"), "mínima a las " + minN.h);
   // Lluvia: atención desde 40 % o si ya llueve.
   var pp = pico ? pico.prob || 0 : 0;
-  if (A.lloviendo) dato(true, "lluvia", "lluvia", "Llueve", "medido en los últimos 20 min");
+  if (A.lloviendo) dato(true, "lluvia", "lluvia", "Llueve", "medido en los últimos 20 min", 190);
   else dato(pp >= 40, pp >= 70 ? "amarillo" : "lluvia", "lluvia", marcado("prob", pp, pp + " %"), pp >= 20 ? "lluvia a las " + pico.h + (mm >= 0.1 ? ", " + mm1(mm) : "") : noche ? "lluvia esta noche" : "lluvia hoy");
   if (hay(A.lluviaHora)) dato(false, "", "pluviometro", mm1(A.lluviaHora), "en la última hora; ahora no llueve");
   if (A.lluviaModelo) dato(false, "", "pluviometro", A.sinLluviaMedida ? "0 mm" : "Lluvia", A.sinLluviaMedida ? "medido en 1 h; el modelo da lluvia" : "ahora, según el modelo");
@@ -2377,6 +2417,13 @@ function recuadrosF(A, horas, x) {
   }
   function caja(r, grande) {
     return el("div", { "class": (grande ? "tile tile-atencion" : "mini") + (r.nivel ? " nv-" + r.nivel : "") }, [icono(r.ic, grande ? 22 : 18), el("div", { "class": (grande ? "tile-v" : "mini-v") + " din" }, r.valor), el("div", { "class": grande ? "tile-c" : "mini-c" }, r.pie)]);
+  }
+  if (op.top) {
+    // Una sola jerarquía: el más importante, grande; los demás, iguales. El color queda para el nivel.
+    var todos = arriba.concat(abajo).sort(function (a, b) { return b.score - a.score; }).slice(0, op.top);
+    return el("div", { "class": "tiles-h" }, todos.map(function (r, i) {
+      return el("div", { "class": "tile-h" + (i === 0 ? " mayor" : "") + (r.nivel ? " nv-" + r.nivel : "") }, [icono(r.ic, i === 0 ? 26 : 22), el("div", { "class": "tile-v din" }, r.valor), el("div", { "class": "tile-c" }, r.pie)]);
+    }));
   }
   return el("div", { "class": "datos-f" + (arriba.length && abajo.length ? " en-dos" : "") }, [arriba.length ? el("div", { "class": "tiles" }, arriba.map(function (r) { return caja(r, true); })) : null,
     abajo.length ? el("div", { "class": "minis" + (arriba.length ? "" : " minis-solas") }, abajo.map(function (r) { return caja(r, false); })) : null]);
@@ -2577,6 +2624,40 @@ function tablaFranjasT(dias, hAhora) {
       })));
     }))]);
 }
+function colsTiempo(A) {
+  var V = vivoV(), h = V.horas || {}, ahora = new Date(V.capturado), hoyK = fechaDe(ahora), cols = [], wa = {};
+  var t0 = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() - 1, 0).getTime(), t1 = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() + 1, 23).getTime();
+  var T = porHora(serieTemp(h)), P = porHora(h.prob), M = porHora(h.lluvia), N = porHora(h.nube);
+  (V.wa_horas || []).forEach(function (f) { wa[String(f[0]).slice(0, 13).replace("T", " ")] = f; });
+  for (var t = t0; t <= t1; t += HORA) {
+    var d = new Date(t), k = fechaDe(d) + " " + ("0" + d.getHours()).slice(-2), w = wa[k];
+    if (!hay(T[k])) continue;
+    var z = { t: t, h: d.getHours(), temp: T[k], prob: w && hay(w[3]) ? w[3] : P[k], mm: (w && hay(w[4]) ? w[4] : M[k]) || 0, nube: N[k] };
+    if (fechaDe(d) === hoyK && d.getHours() === ahora.getHours()) cols.push({ ahora: true, t: t, h: z.h, temp: hay(A.temp) ? A.temp : z.temp, icono: A.icono, prob: null, mm: 0 });
+    else cols.push({ t: t, h: z.h, temp: z.temp, icono: iconoHora(z), prob: z.prob, mm: z.mm, pasado: t < ahora.getTime() });
+  }
+  return cols;
+}
+function rotuloDiaTira(t) {
+  var d0 = new Date(vivoV().capturado), x = new Date(t), a = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate()).getTime(), b = new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  var n = Math.round((b - a) / 86400000);
+  return n === -1 ? "Ayer" : n === 0 ? "Hoy" : n === 1 ? "Mañana" : etiquetaDia({ fecha: fechaDe(x), desfase: 1 });
+}
+function tableroH(v, viene, radar, primero) {
+  var A = datosAhora(), horas = horasQueVienen(), x = datosHoy(), modo = UI.modoTiempo === "franjas" ? "franjas" : "hora";
+  var fechaHoy = new Date(vivoV().capturado).toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
+  var seg = el("div", { "class": "segmentos", role: "group", "aria-label": "Ver el tiempo por" }, [["hora", "Por hora"], ["franjas", "Por franjas"]].map(function (m) {
+    return el("button", { "aria-pressed": String(modo === m[0]), onclick: function () { UI.modoTiempo = m[0]; pintarVista(); } }, m[1]);
+  }));
+  var cuerpo = modo === "hora" ? tiraCurva(A, horas, { cols: colsTiempo(A), centrar: true }) : panelFranjas({ desde: -1, hasta: 2, fijo: true, transpuesta: true, titulo: "AYER, HOY Y MAÑANA" });
+  var caja = el("section", { "class": "hoja bloque caja-tiempo v-F", "aria-label": "Ayer, hoy y mañana" }, [
+    el("div", { "class": "th-cab" }, [el("p", { "class": "bloque-eti" }, ["HOY ", el("span", { text: "· " + fechaHoy })]), seg]),
+    cabeceraF(A, horas), cuerpo || el("p", { "class": "nota", text: "Sin pronóstico por hora." }), recuadrosF(A, horas, x, { top: 5 }), pieF(A),
+    el("p", { "class": "f-pie", text: "Lo anterior a ahora lo estima el modelo: no es medición." })]);
+  if (radar && primero) { radar.classList.add("primero"); v.appendChild(radar); }
+  v.appendChild(caja);
+  v.appendChild(el("div", { "class": "fila-h" + (radar && !primero ? "" : " solo") }, (radar && !primero ? [radar] : []).concat([viene])));
+}
 var ICONOS = {
   humedad: ["M12 3.5s6.5 7 6.5 11.5a6.5 6.5 0 0 1-13 0C5.5 10.5 12 3.5 12 3.5z"],
   viento: ["M3 9h11a3 3 0 1 0-3-3", "M3 14h15a3 3 0 1 1-3 3", "M3 19h6"],
@@ -2634,9 +2715,10 @@ var _estaciones = null;
 var renglonesUltimo = function () { return null; };
 var NIVEL_TORMENTA = { amarillo: "Tormenta en aproximación", naranja: "Tormenta a menos de 20 km", rojo: "Tormenta en la zona" };
 var MOVIL = "(max-width: 720px)";
-var VARIANTES = [["A", "A actual"], ["F", "F tira y curva"], ["G", "G tres columnas"]];
+var VARIANTES = [["A", "A actual"], ["F", "F tira y curva"], ["G", "G tres columnas"], ["H", "H una caja"]];
 var RUMBOS = { norte: 0, nordeste: 45, noreste: 45, este: 90, sudeste: 135, sureste: 135, sur: 180, sudoeste: 225, suroeste: 225, oeste: 270, noroeste: 315 };
 var RUMBO_PALABRA = ["norte", "noreste", "este", "sudeste", "sur", "sudoeste", "oeste", "noroeste"];
+var PESOS_IND = { rayo: 80, fuego: 75, lluvia: 60, sol: 40, viento: 35, hoja: 35, termo: 30, pluviometro: 20, humedad: 15, amanecer: 5, luna: 5 };
 
 var LUGAR_INICIAL = { nombre: "La Población, Córdoba", lat: -32.0667, lon: -65.0333 };
 var ACTUALIZAR_MIN = 15;
