@@ -623,6 +623,52 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 .hoy-grid > .radar-esq { grid-column: span 2; }
 @media (min-width: 1281px) { .hoy-grid > .radar-esq { grid-column: 2 / span 2; } .hoy-grid > .radar-esq.primero { grid-column: 1 / -1; } }
 
+.zonas-h { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(0, 1.5fr) minmax(0, 2fr); }
+.zona-h { padding: 0 16px; min-width: 0; }
+.zona-h:first-child { padding-left: 0; }
+.zona-h:last-child { padding-right: 0; }
+.zona-h + .zona-h { border-left: 1px solid var(--trazo); }
+.zona-h .bloque-eti { margin: 0 0 6px; }
+.zona-h .f-cab .temp-grande { font-size: 64px; }
+.za-temp { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.za-temp small, .md-t small { font-weight: 400; color: var(--tinta2); }
+.za-linea { font-size: 14px; color: var(--tinta2); display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.za-linea svg { color: var(--tinta3); flex: none; }
+.mini-dias { display: grid; grid-template-columns: repeat(auto-fit, minmax(62px, 1fr)); gap: 4px; }
+.mini-dia { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px; border-radius: 10px; text-align: center; }
+.mini-dia.primero { background: var(--hoja2); }
+.mini-dia svg { color: var(--tinta2); }
+.md-rot { font-size: 13px; font-weight: 600; color: var(--tinta2); white-space: nowrap; }
+.mini-dia.primero .md-rot { color: var(--tinta); }
+.md-t { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.md-t small { font-size: 13px; }
+.md-mm { font-size: 13px; color: var(--tinta2); min-height: 16px; white-space: nowrap; }
+.detalle-h { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--trazo); }
+.ind-fila { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); margin-top: 14px; border-top: 1px solid var(--trazo); }
+.ind-celda { display: flex; gap: 8px; align-items: flex-start; padding: 12px 12px 4px; min-width: 0; border-left: 1px solid var(--trazo); }
+.ind-celda:first-child { border-left: 0; padding-left: 0; }
+.ind-celda > svg { flex: none; color: var(--tinta3); margin-top: 2px; }
+.ind-celda .ic-v { font-size: 18px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ind-celda .ic-c { font-size: 13px; color: var(--tinta2); line-height: 1.2; }
+.ind-celda.nv-lluvia > svg { color: var(--acento); }
+.ind-celda.nv-amarillo > svg { color: var(--n-amarillo); }
+.ind-celda.nv-naranja > svg { color: var(--n-naranja); }
+.ind-celda.nv-rojo > svg { color: var(--n-rojo); }
+.ind-celda.nv-violeta > svg { color: var(--n-violeta); }
+@media (max-width: 720px) {
+  .zonas-h { grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) minmax(0, 1fr); }
+  .zona-h { padding: 0 8px; }
+  .zona-h .f-cab { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .zona-h .f-cab .temp-grande { font-size: 46px; }
+  .zona-h .f-cielo { font-size: 13px; gap: 4px; }
+  .zona-h .f-ctx { font-size: 13px; gap: 2px 8px; flex-wrap: wrap; }
+  .za-temp { font-size: 19px; }
+  .za-linea { font-size: 13px; }
+  .ind-fila { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ind-celda { padding: 10px 6px 4px; }
+  .ind-celda:nth-child(3n + 1) { border-left: 0; padding-left: 0; }
+}
+
 .caja-tiempo { margin-bottom: 12px; }
 .th-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
 .th-cab .bloque-eti { margin: 0; }
@@ -2319,7 +2365,7 @@ function tiraCurva(A, horas, op) {
   tira.addEventListener("scroll", flechas, { passive: true });
   setTimeout(flechas, 50); setTimeout(flechas, 600);
   // En la caja de ayer, hoy y mañana la tira empieza en "ahora", con un poco de lo anterior a la izquierda.
-  if (op.centrar) setTimeout(function () { var a = interior.querySelector(".tc-ahora"); if (a) tira.scrollLeft = Math.max(0, a.offsetLeft - ANCHO * 1.6); flechas(); }, 80);
+  if (op.centrar) setTimeout(function () { var a = interior.querySelector(".tc-ahora"); if (a) tira.scrollLeft = Math.max(0, op.centrar === "medio" ? a.offsetLeft - (tira.clientWidth - ANCHO) / 2 : a.offsetLeft - ANCHO * 1.6); flechas(); }, 80);
   return env;
 }
 function recuadro(ic, valor, pie, clase) {
@@ -2417,6 +2463,16 @@ function recuadrosF(A, horas, x, op) {
   }
   function caja(r, grande) {
     return el("div", { "class": (grande ? "tile tile-atencion" : "mini") + (r.nivel ? " nv-" + r.nivel : "") }, [icono(r.ic, grande ? 22 : 18), el("div", { "class": (grande ? "tile-v" : "mini-v") + " din" }, r.valor), el("div", { "class": grande ? "tile-c" : "mini-c" }, r.pie)]);
+  }
+  if (op.fila) {
+    // Una fila de celdas iguales a todo el ancho, en orden de relevancia: nada queda flotando. Lo que cruzó su umbral
+    // se marca con el color de su nivel, como en el resto del panel.
+    var orden = arriba.concat(abajo).sort(function (a, b) { return b.score - a.score; }).slice(0, op.top || 6);
+    if (!orden.length) return null;
+    return el("div", { "class": "ind-fila", role: "list", "aria-label": "Indicadores, del más relevante al menos" }, orden.map(function (r) {
+      return el("div", { "class": "ind-celda" + (r.nivel ? " nv-" + r.nivel : ""), role: "listitem" }, [icono(r.ic, 20),
+        el("div", {}, [el("div", { "class": "ic-v din" }, r.valor), el("div", { "class": "ic-c" }, r.pie)])]);
+    }));
   }
   if (op.top) {
     // Una sola jerarquía: el más importante, grande; los demás, iguales. El color queda para el nivel.
@@ -2644,19 +2700,45 @@ function rotuloDiaTira(t) {
   return n === -1 ? "Ayer" : n === 0 ? "Hoy" : n === 1 ? "Mañana" : etiquetaDia({ fecha: fechaDe(x), desfase: 1 });
 }
 function tableroH(v, viene, radar, primero) {
-  var A = datosAhora(), horas = horasQueVienen(), x = datosHoy(), modo = UI.modoTiempo === "franjas" ? "franjas" : "hora";
-  var fechaHoy = new Date(vivoV().capturado).toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
-  var seg = el("div", { "class": "segmentos", role: "group", "aria-label": "Ver el tiempo por" }, [["hora", "Por hora"], ["franjas", "Por franjas"]].map(function (m) {
+  var V = vivoV(), A = datosAhora(), horas = horasQueVienen(), x = datosHoy(), movil = esMovil(), modo = UI.modoTiempo === "franjas" ? "franjas" : "hora";
+  var hoyK = String(V.capturado).slice(0, 10), dias = diasDeHoras(V).filter(function (d) { return d.fecha > hoyK; }).slice(0, 5), ay = datosAyer();
+  // Izquierda: ayer.
+  var zAyer = el("div", { "class": "zona-h" }, [el("p", { "class": "bloque-eti" }, ["AYER", ay && ay.modelo ? el("span", { text: " · estimado" }) : null]),
+    ay && ay.max !== null ? el("div", { "class": "za-temp din" }, [marcado("calor", ay.max, Math.round(ay.max) + "°"), el("small", {}, [" / ", marcado("frio", ay.min, Math.round(ay.min) + "°")])]) : el("p", { "class": "nota", text: "Sin datos de ayer." }),
+    ay ? el("div", { "class": "za-linea" }, [icono("pluviometro", 16), ay.mm >= 0.1 ? marcado("lluvia", ay.mm, mm1(ay.mm)) : "sin lluvia"]) : null,
+    ay && ay.rafaga >= 30 ? el("div", { "class": "za-linea" }, [icono("viento", 16), "ráfagas ", marcado("rafaga", ay.rafaga, Math.round(ay.rafaga) + " km/h")]) : null]);
+  // Centro: ahora y lo que queda de hoy.
+  var zAhora = el("div", { "class": "zona-h zona-ahora" }, [el("p", { "class": "bloque-eti", text: "AHORA" }), cabeceraF(A, horas)]);
+  // Derecha: mañana y los días siguientes, uno al lado del otro. En el celular, solo mañana; los siguientes van debajo.
+  var zProx = el("div", { "class": "zona-h" }, [el("p", { "class": "bloque-eti", text: movil ? "MAÑANA" : "MAÑANA Y DÍAS SIGUIENTES" }),
+    el("div", { "class": "mini-dias" }, (movil ? dias.slice(0, 1) : dias).map(function (d, k) { return miniDia(d, k === 0 ? "Mañana" : etiquetaDia({ fecha: d.fecha, desfase: 1 }), k === 0); }))]);
+  var seg = el("div", { "class": "segmentos", role: "group", "aria-label": "Ver el detalle por" }, [["hora", "Por hora"], ["franjas", "Por franjas"]].map(function (m) {
     return el("button", { "aria-pressed": String(modo === m[0]), onclick: function () { UI.modoTiempo = m[0]; pintarVista(); } }, m[1]);
   }));
-  var cuerpo = modo === "hora" ? tiraCurva(A, horas, { cols: colsTiempo(A), centrar: true }) : panelFranjas({ desde: -1, hasta: 2, fijo: true, transpuesta: true, titulo: "AYER, HOY Y MAÑANA" });
-  var caja = el("section", { "class": "hoja bloque caja-tiempo v-F", "aria-label": "Ayer, hoy y mañana" }, [
-    el("div", { "class": "th-cab" }, [el("p", { "class": "bloque-eti" }, ["HOY ", el("span", { text: "· " + fechaHoy })]), seg]),
-    cabeceraF(A, horas), cuerpo || el("p", { "class": "nota", text: "Sin pronóstico por hora." }), recuadrosF(A, horas, x, { top: 5 }), pieF(A),
+  var detalle = modo === "hora" ? tiraCurva(A, horas, { cols: colsTiempo(A), centrar: "medio" }) : panelFranjas({ desde: -1, hasta: movil ? 3 : 5, fijo: true, titulo: "POR FRANJAS" });
+  var caja = el("section", { "class": "hoja bloque caja-tiempo v-F", "aria-label": "Ayer, hoy y los días siguientes" }, [
+    el("div", { "class": "zonas-h" }, [zAyer, zAhora, zProx]),
+    el("div", { "class": "detalle-h" }, [el("div", { "class": "th-cab" }, [el("p", { "class": "bloque-eti", text: modo === "hora" ? "POR HORA, DE AYER A MAÑANA" : "POR FRANJAS" }), seg]), detalle]),
+    movil && dias.length > 1 ? el("div", { "class": "detalle-h" }, [el("p", { "class": "bloque-eti", text: "DÍAS SIGUIENTES" }),
+      el("div", { "class": "mini-dias" }, dias.slice(1).map(function (d) { return miniDia(d, etiquetaDia({ fecha: d.fecha, desfase: 1 }), false); }))]) : null,
+    recuadrosF(A, horas, x, { top: 6, fila: true }), pieF(A),
     el("p", { "class": "f-pie", text: "Lo anterior a ahora lo estima el modelo: no es medición." })]);
   if (radar && primero) { radar.classList.add("primero"); v.appendChild(radar); }
   v.appendChild(caja);
-  v.appendChild(el("div", { "class": "fila-h" + (radar && !primero ? "" : " solo") }, (radar && !primero ? [radar] : []).concat([viene])));
+  if (radar && !primero) v.appendChild(radar);
+}
+function iconoDiaH(fecha, mm) {
+  if (mm >= 1) return "lluvia";
+  var n = ((vivoV().horas || {}).nube || []).filter(function (x) { var hh = parseInt(String(x[0]).slice(11, 13), 10); return String(x[0]).slice(0, 10) === fecha && hh >= 9 && hh <= 18; }).map(function (x) { return x[1]; });
+  var c = n.length ? claseCielo(n.reduce(function (a, b) { return a + b; }, 0) / n.length) : "parcial";
+  return c === "despejado" || c === "algo" ? "sol" : "nube";
+}
+function miniDia(d, rotulo, primero) {
+  return el("div", { "class": "mini-dia" + (primero ? " primero" : "") }, [
+    el("div", { "class": "md-rot", text: rotulo }), icono(iconoDiaH(d.fecha, d.mm), 22),
+    el("div", { "class": "md-t din" }, d.max === null ? "—" : [marcado("calor", d.max, Math.round(d.max) + "°"), el("small", {}, [" / ", marcado("frio", d.min, Math.round(d.min) + "°")])]),
+    el("div", { "class": "md-mm" }, d.mm >= 0.1 ? marcado("lluvia", d.mm, mm1(d.mm)) : ""),
+    el("div", { "class": "md-mm" }, d.rafaga >= 50 ? ["ráf. ", marcado("rafaga", d.rafaga, String(Math.round(d.rafaga)))] : "")]);
 }
 var ICONOS = {
   humedad: ["M12 3.5s6.5 7 6.5 11.5a6.5 6.5 0 0 1-13 0C5.5 10.5 12 3.5 12 3.5z"],
