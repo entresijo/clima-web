@@ -573,6 +573,18 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 .v-F .tile-lluvia > svg { color: var(--acento); }
 
 .datos-f { margin-top: 14px; }
+@media (min-width: 900px) {
+  .datos-f.en-dos { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: 0 22px; align-items: start; }
+  .datos-f.en-dos .tiles { margin: 0; grid-template-columns: repeat(auto-fill, 130px); }
+  .datos-f.en-dos .minis { border-top: 0; padding: 0 0 0 22px; border-left: 1px solid var(--trazo); align-self: stretch; align-content: start; }
+}
+.tira-env { position: relative; }
+.tira-flecha { position: absolute; top: 40px; width: 34px; height: 44px; border: 1px solid var(--trazo); border-radius: 10px; background: var(--hoja); color: var(--tinta); font-size: 22px; line-height: 1; padding: 0; box-shadow: var(--sombra); z-index: 2; }
+.tira-flecha[hidden] { display: none; }
+.tira-flecha.izq { left: 2px; } .tira-flecha.der { right: 2px; }
+.tira-env.sigue-der::after { content: ""; position: absolute; top: 0; bottom: 0; right: 0; width: 40px; pointer-events: none; background: linear-gradient(90deg, transparent, var(--hoja)); }
+.tira-env.sigue-izq::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 40px; pointer-events: none; z-index: 1; background: linear-gradient(270deg, transparent, var(--hoja)); }
+@media (hover: none) { .tira-flecha { display: none; } }
 .tile-atencion { box-shadow: inset 0 0 0 1.5px var(--trazo); }
 .tile-atencion .tile-v { font-size: 22px; }
 .tile-atencion.nv-lluvia { box-shadow: inset 0 0 0 1.5px var(--acento); }
@@ -2176,17 +2188,29 @@ function tiraCurva(A, horas) {
   // Sin lluvia en ninguna hora, la fila de la lluvia no ocupa lugar.
   var conLluvia = cols.some(function (c) { return c.prob >= 20; });
   var interior = el("div", { "class": "tc-interior" + (conLluvia ? "" : " sin-lluvia"), style: "width:" + W + "px" }, [s]);
+  var pico_ = cols.reduce(function (a, b) { return (b.prob || 0) > (a ? a.prob || 0 : -1) ? b : a; }, null);
   cols.forEach(function (c) {
     var noche = c.h < 7 || c.h >= 20, cambia = !c.ahora && c.h === 0;
-    var p = c.prob >= 20 ? c.prob : null, barra = p === null ? null : el("span", { "class": "tc-barra", style: "width:" + Math.max(6, Math.round(36 * p / 100)) + "px;" + (p >= 70 ? "background:var(--n-amarillo)" : "") });
+    var p = c.prob >= 20 ? c.prob : null, esPico = p !== null && c === pico_ && p >= 30,
+        // El numero solo en la hora pico; el resto, la barra. Y los mm solo si se notan (desde 0,3).
+        pTxt = esPico ? [marcado("prob", p, p + "%")] : [];
+    if (p !== null && !esPico) pTxt = []; barra = p === null ? null : el("span", { "class": "tc-barra", style: "width:" + Math.max(6, Math.round(36 * p / 100)) + "px;" + (p >= 70 ? "background:var(--n-amarillo)" : "") });
     interior.appendChild(el("div", { "class": "tc-col" + (noche ? " tc-noche" : "") + (c.ahora ? " tc-ahora" : "") + (cambia ? " tc-dia" : ""), role: "listitem",
       "aria-label": (c.ahora ? "Ahora" : c.h + " h") + ": " + ts[cols.indexOf(c)] + "°" + (p !== null ? ", lluvia " + p + " %" : "") }, [
       el("div", { "class": "tc-h", text: c.ahora ? "Ahora" : cambia ? etiquetaDia({ fecha: fechaDe(new Date(c.t)), desfase: 1 }) : c.h + " h" }),
       (function () { var i_ = icono(c.icono, 24); if (c.icono === "lluvia") i_.setAttribute("class", "tc-llueve"); return i_; })(),
       el("div", { "class": "tc-zona" }),
-      el("div", { "class": "tc-lluvia" }, p === null ? "" : [marcado("prob", p, p + "%"), barra, c.mm >= 0.1 ? el("small", { text: fmt(Math.round(c.mm * 10) / 10) }) : ""])]));
+      el("div", { "class": "tc-lluvia" }, p === null ? "" : pTxt.concat([barra, c.mm >= 0.3 ? el("small", { text: fmt(Math.round(c.mm * 10) / 10) }) : ""]))]));
   });
-  return el("div", { "class": "tira-curva", role: "list", "aria-label": "Por hora, hasta las 6 de mañana" }, interior);
+  var tira = el("div", { "class": "tira-curva", role: "list", "aria-label": "Por hora, hasta las 6 de mañana" }, interior);
+  var izq = el("button", { "class": "tira-flecha izq", "aria-label": "Horas anteriores", hidden: true }, "‹"), der = el("button", { "class": "tira-flecha der", "aria-label": "Horas siguientes", hidden: true }, "›");
+  var env = el("div", { "class": "tira-env" }, [tira, izq, der]);
+  function flechas() { izq.hidden = tira.scrollLeft < 8; der.hidden = tira.scrollLeft + tira.clientWidth > tira.scrollWidth - 8; env.classList.toggle("sigue-der", !der.hidden); env.classList.toggle("sigue-izq", !izq.hidden); }
+  izq.addEventListener("click", function () { tira.scrollBy({ left: -tira.clientWidth * 0.7, behavior: "smooth" }); });
+  der.addEventListener("click", function () { tira.scrollBy({ left: tira.clientWidth * 0.7, behavior: "smooth" }); });
+  tira.addEventListener("scroll", flechas, { passive: true });
+  setTimeout(flechas, 50); setTimeout(flechas, 600);
+  return env;
 }
 function recuadro(ic, valor, pie, clase) {
   return el("div", { "class": "tile" + (clase ? " " + clase : "") }, [typeof ic === "string" ? icono(ic, 20) : ic, el("div", { "class": "tile-v din" }, valor), el("div", { "class": "tile-c" }, pie)]);
@@ -2280,7 +2304,7 @@ function recuadrosF(A, horas, x) {
   function caja(r, grande) {
     return el("div", { "class": (grande ? "tile tile-atencion" : "mini") + (r.nivel ? " nv-" + r.nivel : "") }, [icono(r.ic, grande ? 22 : 18), el("div", { "class": (grande ? "tile-v" : "mini-v") + " din" }, r.valor), el("div", { "class": grande ? "tile-c" : "mini-c" }, r.pie)]);
   }
-  return el("div", { "class": "datos-f" }, [arriba.length ? el("div", { "class": "tiles" }, arriba.map(function (r) { return caja(r, true); })) : null,
+  return el("div", { "class": "datos-f" + (arriba.length && abajo.length ? " en-dos" : "") }, [arriba.length ? el("div", { "class": "tiles" }, arriba.map(function (r) { return caja(r, true); })) : null,
     abajo.length ? el("div", { "class": "minis" + (arriba.length ? "" : " minis-solas") }, abajo.map(function (r) { return caja(r, false); })) : null]);
 }
 function rumboPalabra(g) { return hay(g) ? RUMBO_PALABRA[Math.round((((g % 360) + 360) % 360) / 45) % 8] : ""; }
