@@ -132,6 +132,23 @@ button { cursor: pointer; }
 .dato-txt { flex: 1; min-width: 0; }
 .dato-txt .ind-eti { font-size: 13px; }
 .dato-sub { font-size: 12px; color: var(--tinta3); line-height: 1.25; }
+.selector-diseno { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
+.origen { font-size: 11px; font-weight: 400; color: var(--tinta3); }
+.origen-medido { color: var(--ok); }
+.origen-observado { color: var(--acento); }
+.dato-fila.atenuado .dato-val, .dato-fila.atenuado .ind-eti { color: var(--tinta3); font-weight: 400; }
+.atencion-lista { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; }
+.atencion-item { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--trazo); border-left-width: 4px; }
+.atencion-amarillo { border-left-color: var(--n-amarillo); }
+.atencion-naranja { border-left-color: var(--n-naranja); }
+.atencion-rojo { border-left-color: var(--n-rojo); }
+.atencion-violeta { border-left-color: var(--n-violeta); }
+.atencion-granate { border-left-color: var(--n-granate); }
+.atencion-txt { font-size: 15px; }
+.cmp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.cmp-grid h4 { margin: 0 0 4px; font-size: 13px; color: var(--tinta2); }
+.cmp-fila { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; border-bottom: 1px solid var(--trazo); font-size: 13.5px; }
+.cmp-t { color: var(--tinta2); }
 .nivel { font-weight: 700; }
 .nivel-amarillo { color: var(--n-amarillo); }
 .nivel-naranja { color: var(--n-naranja); }
@@ -794,13 +811,26 @@ function tiraDatos() {
   renglonesUltimo = function () { return _ultimo; };
   var d = UI.loc ? {} : (L.datos || {}), v = vivoV(), a = v.actual || {}, q = v.aire || {}, as = v.astro || {}, ca = UI.loc ? { luna: (L.astro || {}).luna } : (L.astro || {}), gr = {}, ex = extrasDeHoras(v);
   var cape = hay(d.cape_max) ? d.cape_max : ex.cape, cota = hay(d.cota_cero) ? d.cota_cero : ex.cero, suelo = hay(d.suelo_min) ? d.suelo_min : ex.suelo;
+  var sit = UI.diseno === "situacion" && !UI.loc;
   function poner(g, ic, val, eti, sub, cl) {
-    if (hay(val)) { _ultimo = renglonDato(ic, val, eti, sub, cl); (gr[g] = gr[g] || []).push(_ultimo); }
+    if (!hay(val)) return;
+    if (sit) { var o = UI.sit.origen(eti); g = UI.sit.grupo(eti, g); _ultimo = renglonDato(ic, val, eti, sub, cl); if (o) _ultimo.querySelector(".ind-eti").appendChild(el("span", { "class": "origen origen-" + o[0], text: " · " + o[1] })); }
+    else _ultimo = renglonDato(ic, val, eti, sub, cl);
+    (gr[g] = gr[g] || []).push(_ultimo);
   }
   var wa = clave("Viene de", "WeatherAPI, consultado por el panel", "Boletín", "no lo usa");
   // Lo consultado por el panel manda; desde v21.30 la corrida guarda lo mismo, por si la consulta falla.
   var sens = hay(a.feelslike_c) ? a.feelslike_c : d.sensacion, roc = hay(a.dewpoint_c) ? a.dewpoint_c : d.rocio;
   poner("Cómo se siente", "termo", hay(sens) ? fmt(sens) + "°" : null, "Sensación", "", clave("Viene de", "WeatherAPI, consultado por el panel", "Boletín", "no sale al aire, por decisión del usuario"));
+  // Atenuada, no oculta ni recalculada: se calcula con la temperatura de WeatherAPI, y si esa se aparta 3° o más de la
+  // medida (OHMC) la sensación no habla de lo que se vive. Medido en el historial: pasa en la mitad de las corridas.
+  if (sit && hay(sens)) {
+    var fila = _ultimo, tm = d.ohmc_temp, tw = hay(a.temp_c) ? a.temp_c : d.temp_wa;
+    if (hay(tm) && hay(tw) && Math.abs(tw - tm) >= 3) {
+      fila.classList.add("atenuado");
+      fila.querySelector(".dato-txt").appendChild(el("div", { "class": "dato-sub", text: "del modelo (" + fmt(tw) + "°): no coincide con lo medido, " + fmt(tm) + "°" }));
+    }
+  }
   // En un lugar, la humedad vive acá: en F no está arriba porque no pide atención.
   if (UI.loc) poner("Cómo se siente", "humedad", hay(a.humidity) ? fmt(a.humidity) + " %" : null, "Humedad", UI.estacion ? "del modelo" : "");
   poner("Cómo se siente", "humedad", hay(roc) ? fmt(roc) + "°" : null, "Punto de rocío", "", wa);
@@ -867,7 +897,7 @@ function tiraDatos() {
   var plegar = esMovil(), abiertos = UI.datosAbiertos || (UI.datosAbiertos = { "Cómo se siente": true });
   return el("section", { "class": "hoja bloque bloque-datos", style: "margin-bottom:12px", "aria-label": "Más datos" }, [
     el("p", { "class": "bloque-eti" }, ["MÁS DATOS ", el("span", { text: v.capturado && !UI.loc ? "· consultados " + fmtHora(v.capturado) : "" })]),
-    el("div", { "class": "datos-grupos" }, ["Cómo se siente", "Cielo", "Tormenta", "Riesgos", "Sol y luna"].filter(function (g) { return gr[g]; }).map(function (g) {
+    el("div", { "class": "datos-grupos" }, (sit ? ["Avisos", "Ahora", "Confort y salud", "Referencia", "Cómo se siente", "Cielo", "Tormenta", "Riesgos", "Sol y luna"] : ["Cómo se siente", "Cielo", "Tormenta", "Riesgos", "Sol y luna"]).filter(function (g) { return gr[g]; }).map(function (g) {
       if (!plegar) return el("div", { "class": "datos-grupo" }, [el("h4", { text: g })].concat(gr[g]));
       var d = el("details", { "class": "datos-grupo" }, [el("summary", {}, [el("span", {}, [g, el("small", { text: gr[g].length + (gr[g].length === 1 ? " dato" : " datos") })])])].concat(gr[g]));
       d.open = !!abiertos[g];
