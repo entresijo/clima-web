@@ -621,7 +621,9 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 .mini-c { font-size: 13px; color: var(--tinta3); line-height: 1.15; }
 
 .hoy-grid > .radar-esq { grid-column: span 2; }
-.franjas.t thead th { text-align: center; font-size: 13px; padding: 4px 2px; white-space: nowrap; }
+.franjas.t thead th { text-align: center; font-size: 12px; padding: 4px 1px; white-space: nowrap; }
+@media (max-width: 720px) { .franjas.t thead th { font-size: 13px; } }
+.dia-ayer .franjas.t thead th:first-child, .dia-ayer .franjas.t tbody th { display: none; }
 .franjas.t thead th small { display: block; font-weight: 400; font-size: 12px; color: var(--tinta3); }
 .franjas.t thead th:first-child { width: 58px; }
 .franjas.t tbody th { font-size: 14px; white-space: nowrap; padding: 6px 4px 6px 0; }
