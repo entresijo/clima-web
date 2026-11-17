@@ -585,7 +585,7 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 .v-F .tile-atencion.nv-naranja > svg { color: var(--n-naranja); }
 .v-F .tile-atencion.nv-rojo > svg { color: var(--n-rojo); }
 .datos-f .tiles { margin: 0 0 10px; }
-.minis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 6px; padding-top: 10px; border-top: 1px solid var(--trazo); }
+.minis { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px 6px; padding-top: 10px; border-top: 1px solid var(--trazo); }
 .mini { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 3px; min-width: 0; }
 .mini > svg { color: var(--tinta3); }
 .mini-v { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -1916,11 +1916,12 @@ function datosAhora() {
   var clase = hay(a.cloud) ? claseCielo(a.cloud) : "", llueve = /lluv|llovizna|chapar|torment/i.test(a.condicion || "") || a.precip_mm >= 0.2;
   // "Llueve" se afirma solo si lo mide la estación (regla del usuario: medido solo donde hay medición). El 16/11 el
   // modelo decía "Llovizna" y la página "Llueve" con la estación en 0 mm. Lo del modelo se dice como del modelo.
-  var sabe = med.medido && hay(med.lluvia_1h), mide = sabe && (med.lluvia_1h > 0 || med.lluvia_20 > 0), modeloLlueve = llueve;
+  // "Ahora" es lo de los ultimos 20 min. Lluvia en la ultima hora y nada en 20 min es "llovio hace poco", no "llueve".
+  var sabe = med.medido && hay(med.lluvia_20), mide = sabe && med.lluvia_20 > 0, hacePoco = sabe && !mide && med.lluvia_1h > 0, modeloLlueve = llueve;
   llueve = mide;
   var cieloTxt = !modeloLlueve || mide ? (a.condicion || "") : sabe ? (CIELO[clase] || "Nublado") : (a.condicion || "") + ", según el modelo";
   return { temp: med.medido && hay(med.temp) ? med.temp : a.temp_c, med: med, cielo: cieloTxt, icono: iconoCielo(clase, mide || (modeloLlueve && !sabe) ? "lluvia" : ""), hum: a.humidity,
-    lluviaModelo: modeloLlueve && !mide, sinLluviaMedida: sabe && !mide,
+    lluviaModelo: modeloLlueve && !mide && !hacePoco, sinLluviaMedida: sabe && !mide, lluviaHora: hacePoco ? med.lluvia_1h : null,
     viento: med.medido && hay(med.viento) ? med.viento : a.wind_kph, vientoMedido: med.medido && hay(med.viento), dir: a.wind_dir ? "del " + a.wind_dir : "",
     rafaga: a.gust_kph, presion: a.pressure_mb, llovio: med.medido && hay(med.lluvia_dia) ? med.lluvia_dia : llovio, lloviendo: llueve, modelo: a.temp_c };
 }
@@ -2242,8 +2243,9 @@ function recuadrosF(A, horas, x) {
   if (minN && colorDe("frio", minN.temp)) dato(true, colorDe("frio", minN.temp), "termo", marcado("frio", minN.temp, Math.round(minN.temp) + "°"), "mínima a las " + minN.h);
   // Lluvia: atención desde 40 % o si ya llueve.
   var pp = pico ? pico.prob || 0 : 0;
-  if (A.lloviendo) dato(true, "lluvia", "lluvia", "Llueve", "ahora, medido" + (mm >= 0.1 ? " · " + mm1(mm) + " más" : ""));
+  if (A.lloviendo) dato(true, "lluvia", "lluvia", "Llueve", "medido en los últimos 20 min");
   else dato(pp >= 40, pp >= 70 ? "amarillo" : "lluvia", "lluvia", marcado("prob", pp, pp + " %"), pp >= 20 ? "lluvia a las " + pico.h + (mm >= 0.1 ? ", " + mm1(mm) : "") : noche ? "lluvia esta noche" : "lluvia hoy");
+  if (hay(A.lluviaHora)) dato(false, "", "pluviometro", mm1(A.lluviaHora), "en la última hora; ahora no llueve");
   if (A.lluviaModelo) dato(false, "", "pluviometro", A.sinLluviaMedida ? "0 mm" : "Lluvia", A.sinLluviaMedida ? "medido en 1 h; el modelo da lluvia" : "ahora, según el modelo");
   // Viento: la ráfaga manda; atención desde el amarillo del SMN. Si no, el viento de ahora con su rumbo.
   var raf = x && x.rafaga !== null ? x.rafaga : null, cR = colorDe("rafaga", raf);
