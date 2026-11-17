@@ -594,6 +594,8 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 .radar-esq { grid-column: span 2; }
 @media (max-width: 1280px) { .radar-esq { order: 2; } }
 @media (max-width: 1040px) { .radar-esq { grid-column: auto; } }
+.radar-esq.primero { order: 0 !important; }
+.minis.minis-solas { border-top: 0; padding-top: 0; }
 .radar-cab p { margin: 0; }
 .radar-estado { font-size: 19px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 .radar-estado.nivel-amarillo, .radar-estado.nivel-naranja, .radar-estado.nivel-rojo { font-weight: 700; }
@@ -1889,7 +1891,9 @@ function tableroDias(v, ahora, viene) {
   else ahoraHoy = [bloqueVariante(varianteActual(), movil)];
   // El radar del VPS, cuando la cáscara lo trae (la pública lo pide; el panel LAN tiene su bloque propio).
   var radar = UI.cerca ? radarEsquema(UI.cerca.datos, UI.cerca.op) : null;
-  if (radar) ahoraHoy = ahoraHoy.concat([radar]);
+  var nivR = UI.cerca && UI.cerca.datos.tormenta && UI.cerca.datos.tormenta.nivel;
+  if (radar && (nivR === "rojo" || nivR === "naranja")) { radar.classList.add("primero"); ahoraHoy = [radar].concat(ahoraHoy); }
+  else if (radar) ahoraHoy = ahoraHoy.concat([radar]);
   v.appendChild(selectorVariante());
   if (movil) {
     v.appendChild(pestanas([
@@ -2223,6 +2227,19 @@ function recuadrosF(A, horas, x) {
   var pico = tramo.reduce(function (p, b) { return !p || (b.prob || 0) > (p.prob || 0) ? b : p; }, null), mm = tramo.reduce(function (s_, z) { return s_ + z.mm; }, 0);
   var arriba = [], abajo = [];
   function dato(atencion, nivel, ic, valor, pie) { (atencion ? arriba : abajo).push({ nivel: nivel, ic: ic, valor: valor, pie: pie }); }
+  // Reglas de PROPUESTA_DISENO_POR_SITUACION.md (usuario, 16/11): lo que cruza su umbral sube; lo que no tiene
+  // nada que decir no ocupa lugar; lo del modelo que contradice a lo medido se oculta.
+  var ce = UI.cerca && UI.cerca.datos, tor = ce && ce.tormenta, nivT = tor && tor.nivel, tormentaCerca = nivT === "rojo" || nivT === "naranja";
+  var difMed = A.med.medido && hay(A.temp) && hay(A.modelo) && Math.abs(A.temp - A.modelo) >= 3;
+  // Tormenta en aproximación: con naranja o rojo no hace falta, el esquema ya está arriba de todo.
+  if (nivT === "amarillo" && hay(tor.km)) dato(true, "amarillo", "rayo", "Tormenta", "en aproximación, " + lugarRadar(tor.km, tor.rumbo));
+  // Foco de calor a 50 km: la aclaración de la detección satelital va en el esquema.
+  var fo0 = ce && ce.focos && (ce.focos.lista || [])[0];
+  if (fo0) dato(true, ce.focos.nivel || "amarillo", "fuego", "Foco", lugarRadar(fo0.km, fo0.rumbo) + ", por satélite");
+  // Calor y helada: la máxima desde 34° y la mínima desde 3°.
+  var maxHoy = x && x.dia.length ? Math.max.apply(null, x.dia.concat(hay(A.temp) ? [A.temp] : [])) : null, minN = minNoche(horas);
+  if (maxHoy !== null && colorDe("calor", maxHoy)) dato(true, colorDe("calor", maxHoy), "termo", marcado("calor", maxHoy, Math.round(maxHoy) + "°"), "máxima de hoy");
+  if (minN && colorDe("frio", minN.temp)) dato(true, colorDe("frio", minN.temp), "termo", marcado("frio", minN.temp, Math.round(minN.temp) + "°"), "mínima a las " + minN.h);
   // Lluvia: atención desde 40 % o si ya llueve.
   var pp = pico ? pico.prob || 0 : 0;
   if (A.lloviendo) dato(true, "lluvia", "lluvia", "Llueve", "ahora, medido" + (mm >= 0.1 ? " · " + mm1(mm) + " más" : ""));
@@ -2231,27 +2248,38 @@ function recuadrosF(A, horas, x) {
   // Viento: la ráfaga manda; atención desde el amarillo del SMN. Si no, el viento de ahora con su rumbo.
   var raf = x && x.rafaga !== null ? x.rafaga : null, cR = colorDe("rafaga", raf);
   if (cR) dato(true, cR, "viento", marcado("rafaga", raf, Math.round(raf) + " km/h"), "ráfagas hasta");
-  if (hay(A.viento)) dato(false, "", "viento", Math.round(A.viento) + " km/h", (A.dir || "viento") + (!cR && raf >= 30 ? ", ráfagas " + Math.round(raf) : ""));
+  // El viento de ahora, solo desde 20 km/h (leve, por debajo, en la escala del SMN) o con ráfagas desde 30.
+  if (hay(A.viento) && (A.viento >= 20 || (!cR && raf >= 30))) dato(false, "", "viento", Math.round(A.viento) + " km/h", (A.dir || "viento") + (!cR && raf >= 30 ? ", ráfagas " + Math.round(raf) : ""));
   // Sensación: atención si es de calor fuerte o de helada.
   var sens = hay(a.feelslike_c) ? a.feelslike_c : d.sensacion, cS = hay(sens) ? colorDe(colorDe("frio", sens) ? "frio" : "calor", sens) : "";
-  if (hay(sens)) dato(!!cS, cS, "termo", marcaTemp(sens, Math.round(sens) + "°"), "sensación");
-  if (hay(A.hum)) dato(false, "", "humedad", fmt(A.hum) + " %", "humedad");
-  // UV: atención desde alto (6, OMS). Solo de día.
+  // La sensación es del modelo: si lo medido difiere 3° o más de la temperatura del modelo, no vale (en 330 corridas
+  // pasó la mitad de las veces: scripts/analisis_20261112/sensacion_vs_medida.py). Y solo si difiere 3° de la temperatura.
+  var baseS = A.med.medido ? A.modelo : A.temp;
+  if (hay(sens) && !difMed && !tormentaCerca && hay(baseS) && Math.abs(sens - baseS) >= 3) dato(!!cS, cS, "termo", marcaTemp(sens, Math.round(sens) + "°"), "sensación");
+  // La humedad relativa depende de la temperatura: con lo medido lejos del modelo, queda en Más datos.
+  if (hay(A.hum) && !difMed) dato(false, "", "humedad", fmt(A.hum) + " %", "humedad");
+  // UV, según su valor (usuario, 16/11): arriba desde 6, en la grilla desde 3, oculto por debajo y de noche.
+  // No se oculta por nubosidad: el índice del modelo ya descuenta las nubes.
   var uv = hay(a.uv) ? a.uv : d.uv;
-  if (hay(uv) && hh >= 7 && hh < 19) dato(uv >= 6, colorDe("uv", uv), "sol", marcado("uv", uv, String(Math.round(uv))), "UV " + nivelUV(uv).toLowerCase());
+  if (hay(uv) && uv >= 3 && hh >= 7 && hh < 19) dato(uv >= 6, colorDe("uv", uv), "sol", marcado("uv", uv, String(Math.round(uv))), "UV " + nivelUV(uv).toLowerCase());
   // Aire: atención desde "mala para sensibles" (EPA 3).
   var epa = hay(q.epa) ? q.epa : d.epa;
-  if (hay(epa)) dato(epa >= 3, colorDe("aire", epa), "hoja", marcado("aire", epa, epa === 3 ? "Mala" : String(AIRE_EPA[epa] || epa)), epa === 3 ? "aire, para sensibles" : "aire");
+  if (hay(epa) && epa >= 2) dato(epa >= 3, colorDe("aire", epa), "hoja", marcado("aire", epa, epa === 3 ? "Mala" : String(AIRE_EPA[epa] || epa)), epa === 3 ? "aire, para sensibles" : "aire");
   // Lo que llovió: atención desde 10 mm.
-  if (hay(A.llovio)) dato(A.llovio >= 10, colorDe("lluvia", A.llovio), "pluviometro", marcado("lluvia", A.llovio, mm1(A.llovio)), A.med.medido && hay(A.med.lluvia_dia) ? "llovió, medido" : "llovió hoy");
+  if (hay(A.llovio) && A.llovio >= 0.1) dato(A.llovio >= 10, colorDe("lluvia", A.llovio), "pluviometro", marcado("lluvia", A.llovio, mm1(A.llovio)), A.med.medido && hay(A.med.lluvia_dia) ? "llovió, medido" : "llovió hoy");
   // El sol: lo próximo que pasa, salida o puesta.
   var sale = as.sale_sol, pone = as.pone_sol, hm = ("0" + hh).slice(-2) + ":" + ("0" + new Date(V.capturado).getMinutes()).slice(-2);
-  if (sale && pone) dato(false, "", "amanecer", hm < pone && hm >= sale ? pone : sale, hm < pone && hm >= sale ? "se pone el sol" : "sale el sol");
+  // Solo en las 2 horas previas, y no con tormenta cerca.
+  function aMin(t) { return parseInt(t.slice(0, 2), 10) * 60 + parseInt(t.slice(3, 5), 10); }
+  if (sale && pone && !tormentaCerca) {
+    var dia_ = hm < pone && hm >= sale, falta = (aMin(dia_ ? pone : sale) - aMin(hm) + 1440) % 1440;
+    if (falta <= 120) dato(false, "", "amanecer", dia_ ? pone : sale, dia_ ? "se pone el sol" : "sale el sol");
+  }
   function caja(r, grande) {
     return el("div", { "class": (grande ? "tile tile-atencion" : "mini") + (r.nivel ? " nv-" + r.nivel : "") }, [icono(r.ic, grande ? 22 : 18), el("div", { "class": (grande ? "tile-v" : "mini-v") + " din" }, r.valor), el("div", { "class": grande ? "tile-c" : "mini-c" }, r.pie)]);
   }
   return el("div", { "class": "datos-f" }, [arriba.length ? el("div", { "class": "tiles" }, arriba.map(function (r) { return caja(r, true); })) : null,
-    el("div", { "class": "minis" }, abajo.map(function (r) { return caja(r, false); }))]);
+    abajo.length ? el("div", { "class": "minis" + (arriba.length ? "" : " minis-solas") }, abajo.map(function (r) { return caja(r, false); })) : null]);
 }
 function rumboPalabra(g) { return hay(g) ? RUMBO_PALABRA[Math.round((((g % 360) + 360) % 360) / 45) % 8] : ""; }
 function minDesde(iso) { var t = new Date(iso).getTime(); return isNaN(t) ? null : Math.round((Date.now() - t) / 60000); }
@@ -2421,6 +2449,14 @@ function radarEsquema(datos, op) {
     if (!hu) linea("Humo: sin dato reciente");
     else linea(hu.fraccion > 0 ? "Humo detectado" + (hay(hu.km) ? ", el más cercano a " + Math.round(hu.km) + " km" : "") + "." : "Sin humo detectado a 50 km");
   }
+  // Varios renglones de "sin" son ruido: se juntan en uno.
+  var NOMBRE_SIN = [[/^Sin rayos/, "rayos"], [/^Radar: sin núcleos/, "núcleos de radar"], [/^Sin focos/, "focos de calor"], [/^Sin humo/, "humo"]];
+  var sinNada = [], conAlgo = lineas.filter(function (li) {
+    var n = NOMBRE_SIN.filter(function (q) { return q[0].test(li.textContent); })[0];
+    if (n) sinNada.push(n[1]);
+    return !n;
+  });
+  if (sinNada.length >= 2) lineas = conAlgo.concat([el("li", { text: "Sin " + sinNada.slice(0, -1).join(", ") + " ni " + sinNada[sinNada.length - 1] + " a 50 km" })]);
   sec.appendChild(el("ul", { "class": "radar-lineas" }, lineas));
   sec.appendChild(el("p", { "class": "f-pie" }, [(d.fuentes || "VPS") + (d.revisado ? " · revisado " + dosHoras(d.revisado) : "") + ".",
     viejo !== null && viejo > 15 ? el("b", { "class": "nivel nivel-amarillo", text: " Dato de hace " + viejo + " min." }) : ""]));
