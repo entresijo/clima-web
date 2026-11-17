@@ -620,7 +620,12 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 .mini-v { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .mini-c { font-size: 13px; color: var(--tinta3); line-height: 1.15; }
 
-.dias-3 { display: grid; grid-template-columns: minmax(230px, 1fr) minmax(0, 2.6fr) minmax(250px, 1fr); gap: 12px; align-items: start; margin-bottom: 12px; }
+.dias-3 { display: grid; grid-template-columns: minmax(230px, 1fr) minmax(0, 2.3fr) minmax(300px, 1.3fr); gap: 12px; align-items: start; margin-bottom: 12px; }
+.dia-col .franjas th, .dia-col .franjas td { padding: 6px 3px; }
+.dia-col .franjas thead th:first-child { width: 78px; }
+.dia-col .fr-temp { font-size: 17px; gap: 3px; }
+.dia-col .fr-temp svg { display: none; }
+.dia-ayer .franjas td { text-align: center; }
 .dia-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .dia-col > * { order: 0 !important; grid-column: auto; }
 @media (max-width: 1099px) { .dias-3 { grid-template-columns: 1fr 1fr; } .dia-hoy { grid-column: 1 / -1; order: -1; } }
@@ -1943,8 +1948,9 @@ function tableroDias(v, ahora, viene) {
     var rearmar = function () { pintarVista(); };
     if (tableroDias.mira.addEventListener) tableroDias.mira.addEventListener("change", rearmar); else tableroDias.mira.addListener(rearmar);
   }
-  if (A) { var s = ahora(); s.classList.add("bloque-junto"); s.appendChild(franjaHoy({ sinBoton: movil })); ahoraHoy = [s]; }
-  else ahoraHoy = [bloqueVariante(varianteActual(), movil)];
+  // Las franjas están siempre a la vista, en el celular y en la PC: ningún bloque lleva el botón de abrirlas.
+  if (A) { var s = ahora(); s.classList.add("bloque-junto"); s.appendChild(franjaHoy({ sinBoton: true })); ahoraHoy = [s]; }
+  else ahoraHoy = [bloqueVariante(varianteActual(), movil, true)];
   // El radar del VPS, cuando la cáscara lo trae (la pública lo pide; el panel LAN tiene su bloque propio).
   var radar = UI.cerca ? radarEsquema(UI.cerca.datos, UI.cerca.op) : null;
   var nivR = UI.cerca && UI.cerca.datos.tormenta && UI.cerca.datos.tormenta.nivel;
@@ -1957,13 +1963,12 @@ function tableroDias(v, ahora, viene) {
       ["hoy", "Hoy", ahoraHoy.concat([panelFranjas({ desde: 0, hasta: 2, fijo: true, titulo: "PRONÓSTICO POR FRANJAS" })])],
       ["proximos", "Próximos", [viene, panelFranjas({ desde: 1, hasta: 5, fijo: true, titulo: "POR FRANJAS" })]]]));
   } else {
-    // Pantalla ancha: el eje del tiempo de izquierda a derecha, Ayer | Hoy | Próximos. Todo lo de hoy, radar
-    // incluido, va en la columna del medio. El pronóstico por franjas, que se abre y se cierra, va debajo, a todo el ancho.
+    // Pantalla ancha: el eje del tiempo de izquierda a derecha, Ayer | Hoy | Próximos. Cada columna lleva lo
+    // mismo que su pestaña del celular. Todo lo de hoy, radar incluido, va en la columna del medio.
     v.appendChild(el("div", { "class": "dias-3" }, [
-      el("div", { "class": "dia-col dia-ayer" }, [bloqueAyer()]),
-      el("div", { "class": "dia-col dia-hoy" }, ahoraHoy),
-      el("div", { "class": "dia-col dia-prox" }, [viene])]));
-    v.appendChild(panelFranjas());
+      el("div", { "class": "dia-col dia-ayer" }, [bloqueAyer(), panelFranjas({ desde: -1, hasta: 0, fijo: true, titulo: "AYER, POR FRANJAS" })]),
+      el("div", { "class": "dia-col dia-hoy" }, ahoraHoy.concat([panelFranjas({ desde: 0, hasta: 2, fijo: true, titulo: "PRONÓSTICO POR FRANJAS" })])),
+      el("div", { "class": "dia-col dia-prox" }, [viene, panelFranjas({ desde: 1, hasta: 4, fijo: true, titulo: "POR FRANJAS" })])]));
   }
 }
 function datosAhora() {
@@ -2161,13 +2166,13 @@ function cuerpoPulido(A, horas) {
   if (x.rafaga !== null) nodos.push(el("p", { "class": "ind-eti", style: "margin:4px 0 0" }, ["Ráfagas hasta ", marcado("rafaga", x.rafaga, Math.round(x.rafaga) + " km/h")]));
   return nodos;
 }
-function bloqueVariante(v, movil) {
+function bloqueVariante(v, movil, fijas) {
   var A = datosAhora(), horas = horasQueVienen(), x = datosHoy();
   var sec = el("section", { "class": "hoja bloque bloque-ahora bloque-junto v-" + v, "aria-label": "Ahora y lo que queda del día" }, [cabeceraAhora(A), lineaDiferencia(A)]);
   if (v === "F") {
     var fechaHoy = new Date(vivoV().capturado).toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
     sec = el("section", { "class": "hoja bloque bloque-ahora bloque-junto v-F", "aria-label": "Ahora y lo que queda del día" }, [movil ? null : el("p", { "class": "bloque-eti" }, ["HOY ", el("span", { text: "· " + fechaHoy })]), cabeceraF(A, horas), tiraCurva(A, horas), recuadrosF(A, horas, x), pieF(A)]);
-    if (!movil) sec.appendChild(el("div", { "class": "ah-pie" }, botonFranjas()));
+    if (!movil && !fijas) sec.appendChild(el("div", { "class": "ah-pie" }, botonFranjas()));
     return sec;
   }
   else if (v === "C") { sec.appendChild(frasesDia(A, horas)); sec.appendChild(curvaDia(A, horas)); sec.appendChild(datosEnLinea(A, x)); }
