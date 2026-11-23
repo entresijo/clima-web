@@ -2436,11 +2436,13 @@ function recuadrosDia(A, horas, x) {
   if (hay(A.llovio)) r.push(recuadro("lluvia", mm1(A.llovio), A.med.medido && hay(A.med.lluvia_dia) ? el("span", { "class": "ind-medido", text: "llovió hoy, medido" }) : "llovió hoy, modelo"));
   return el("div", { "class": "tiles" }, r);
 }
-function cabeceraF(A, horas) {
+function cabeceraF(A, horas, op) {
   var x = datosHoy(), min = minNoche(horas), max = null;
-  if (x && x.dia.length) max = Math.max.apply(null, x.dia.concat(hay(A.temp) ? [A.temp] : []));
+  // op.futuro (variante I): solo lo que falta y lo de ahora; las horas pasadas del modelo no cuentan como dato.
+  var base = x ? (op && op.futuro ? x.t : x.dia) : [];
+  if (base.length || (op && op.futuro && hay(A.temp))) max = Math.max.apply(null, base.concat(hay(A.temp) ? [A.temp] : []));
   var contexto = [];
-  if (max !== null) contexto.push(el("span", {}, ["Máx. ", marcado("calor", max, Math.round(max) + "°")]));
+  if (max !== null) contexto.push(el("span", {}, [op && op.futuro ? "Máx. restante " : "Máx. ", marcado("calor", max, Math.round(max) + "°")]));
   if (min) contexto.push(el("span", {}, ["Mín. ", marcaTemp(min.temp, Math.round(min.temp) + "°"), el("small", { text: " a las " + min.h })]));
   return el("div", { "class": "f-cab" }, [
     el("div", { "class": "temp-grande din" }, hay(A.temp) ? marcaTemp(A.temp, Math.round(A.temp) + "°") : "—"),
@@ -2800,7 +2802,7 @@ function tableroI(v, viene, radar, primero) {
   var zAyer = ay ? el("div", { "class": "zona-h zona-ayer" }, [el("p", { "class": "bloque-eti", text: "AYER" }),
     ay.max !== null ? el("div", { "class": "za-temp din" }, [marcado("calor", ay.max, Math.round(ay.max) + "°"), el("small", {}, [" / ", marcado("frio", ay.min, Math.round(ay.min) + "°")])]) : null,
     ay.mm !== null && ay.mm >= 0.1 ? el("div", { "class": "za-linea" }, [icono("pluviometro", 16), marcado("lluvia", ay.mm, mm1(ay.mm))]) : null]) : null;
-  var zAhora = el("div", { "class": "zona-h zona-ahora" }, [el("p", { "class": "bloque-eti", text: "AHORA" }), cabeceraF(A, horas), recuadrosF(A, horas, x, { top: 4, fila: true }), pieI(A)]);
+  var zAhora = el("div", { "class": "zona-h zona-ahora" }, [el("p", { "class": "bloque-eti", text: "AHORA" }), cabeceraF(A, horas, { futuro: true }), recuadrosF(A, horas, x, { top: 4, fila: true }), pieI(A)]);
   function rot(d, k) { return k === 0 ? "Mañana" : etiquetaDia({ fecha: d.fecha, desfase: 1 }); }
   var zProx = el("div", { "class": "zona-h zona-prox" }, [el("p", { "class": "bloque-eti", text: "MAÑANA Y DÍAS SIGUIENTES" }),
     el("div", { "class": "mini-dias" }, dias.map(function (d, k) { return miniDiaI(d, rot(d, k), k === 0, sel && d.fecha === sel.fecha); }))]);
