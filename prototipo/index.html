@@ -2818,10 +2818,14 @@ function ventanaHorasI(V, fechas, ahoraK, hoy, centrarEn) {
   fechas.forEach(function (f) { for (var hh = 0; hh < 24; hh++) celdas.push(celdaHoraI(V, f, hh, ahoraK, mapas)); });
   var riel = el("div", { "class": "vent-riel", tabindex: "0", role: "group", "aria-label": "Horas, deslizable" }, celdas);
   // Con setTimeout: el riel todavía no tiene ancho cuando se arma. Lleva ahora al primer tercio, o la mañana del día elegido.
-  setTimeout(function () {
+  function llevar() {
     var c = riel.children[centrarEn];
-    if (c) riel.scrollLeft = Math.max(0, c.offsetLeft - riel.clientWidth / 3);
-  }, 0);
+    if (!c || !riel.clientWidth) return;
+    riel.style.scrollBehavior = "auto";
+    riel.scrollLeft = Math.max(0, c.getBoundingClientRect().left - riel.getBoundingClientRect().left + riel.scrollLeft - riel.clientWidth / 3);
+    riel.style.scrollBehavior = "";
+  }
+  setTimeout(llevar, 0); setTimeout(llevar, 150);
   return riel;
 }
 function miniDiaI(d, rotulo, primero, elegido) {
