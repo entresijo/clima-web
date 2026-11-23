@@ -710,6 +710,7 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 .otro-t svg { width: 20px; height: 20px; }
 .otro-e { font-size: 12px; }
 @media (max-width: 899px) { .fila-i { grid-template-columns: minmax(0, 1fr); } }
+.otro-t.ancho { grid-column: span 2; }
 .otro-t.alto .otro-v { color: var(--tinta); }
 .otro-t.alto { box-shadow: inset 0 0 0 2px var(--n-amarillo); }
 .otro-t.alto svg { color: var(--n-amarillo); }
@@ -2902,7 +2903,7 @@ function otrosDatosI(A) {
   if (as.fase) r(as.iluminacion >= 95 || as.iluminacion <= 5 ? 14 : 5, "luna", fmt(as.iluminacion) + " %", String(as.fase));
   // Lista fija: mismo orden siempre. El peso solo decide cuáles se encienden (desde 50) y cuáles quedan en normal.
   var tiles = t.map(function (d) {
-    return el("div", { "class": "otro-t" + (d.peso >= 50 ? " alto" : " normal") }, [icono(d.ic, 22), el("div", { "class": "otro-v din" }, d.val), el("div", { "class": "otro-e", text: d.eti })]);
+    return el("div", { "class": "otro-t" + (d.peso >= 50 ? " alto" : " normal") + (d.eti === "Sol" ? " ancho" : "") }, [icono(d.ic, 22), el("div", { "class": "otro-v din" }, d.val), el("div", { "class": "otro-e", text: d.eti })]);
   });
   return el("section", { "class": "hoja bloque otros-i", "aria-label": "Datos, del modelo" }, [
     el("p", { "class": "bloque-eti" }, ["DATOS ", el("span", { text: "· modelo" })]), el("div", { "class": "otros-grid" }, tiles)]);
