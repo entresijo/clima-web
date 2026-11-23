@@ -700,6 +700,16 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 .otro-t svg { color: var(--tinta3); width: 28px; height: 28px; }
 .otro-t.normal .otro-v, .otro-t.normal .otro-e { color: var(--tinta2); }
 .otro-t.normal svg { opacity: .7; }
+.f-presion { display: inline-flex; align-items: center; gap: 4px; color: var(--tinta2); }
+.f-presion svg { color: var(--tinta3); }
+.fila-i { grid-template-columns: minmax(320px, 520px) minmax(0, 1fr); }
+.fila-i > .radar-esq > .f-pie { display: none; }
+.otros-grid { grid-auto-rows: auto; align-content: center; gap: 8px; }
+.otro-t { padding: 12px 6px; gap: 4px; }
+.otro-v { font-size: 21px; }
+.otro-t svg { width: 20px; height: 20px; }
+.otro-e { font-size: 12px; }
+@media (max-width: 899px) { .fila-i { grid-template-columns: minmax(0, 1fr); } }
 .otro-t.alto .otro-v { color: var(--tinta); }
 .otro-t.alto { box-shadow: inset 0 0 0 2px var(--n-amarillo); }
 .otro-t.alto svg { color: var(--n-amarillo); }
@@ -2449,6 +2459,8 @@ function cabeceraF(A, horas, op) {
   var contexto = [];
   if (max !== null) contexto.push(el("span", {}, [op && op.futuro ? "Máx. restante " : "Máx. ", marcado("calor", max, Math.round(max) + "°")]));
   if (min) contexto.push(el("span", {}, ["Mín. ", marcaTemp(min.temp, Math.round(min.temp) + "°"), el("small", { text: " a las " + min.h })]));
+  var pa = op && op.futuro ? (vivoV().actual || {}).pressure_mb : null;
+  if (hay(pa)) contexto.push(el("span", { "class": "f-presion" }, [icono("presion", 15), " " + pa + " hPa"]));
   return el("div", { "class": "f-cab" }, [
     el("div", { "class": "temp-grande din" }, hay(A.temp) ? marcaTemp(A.temp, Math.round(A.temp) + "°") : "—"),
     el("div", { "class": "f-lado" }, [A.cielo ? el("div", { "class": "f-cielo" }, [icono(A.icono, 22), A.cielo]) : null, el("div", { "class": "f-ctx din" }, contexto)])]);
@@ -2808,7 +2820,7 @@ function tableroI(v, viene, radar, primero) {
   var zAyer = ay ? el("div", { "class": "zona-h zona-ayer" }, [el("p", { "class": "bloque-eti", text: "AYER" }),
     ay.max !== null ? el("div", { "class": "za-temp din" }, [marcado("calor", ay.max, Math.round(ay.max) + "°"), el("small", {}, [" / ", marcado("frio", ay.min, Math.round(ay.min) + "°")])]) : null,
     ay.mm !== null && ay.mm >= 0.1 ? el("div", { "class": "za-linea" }, [icono("pluviometro", 16), marcado("lluvia", ay.mm, mm1(ay.mm))]) : null]) : null;
-  var zAhora = el("div", { "class": "zona-h zona-ahora" }, [el("p", { "class": "bloque-eti", text: "AHORA" }), cabeceraF(A, horas, { futuro: true }), recuadrosF(A, horas, x, { top: 4, fila: true }), pieI(A)]);
+  var zAhora = el("div", { "class": "zona-h zona-ahora" }, [el("p", { "class": "bloque-eti" }, ["AHORA", el("span", { text: A.med.medido ? " · medido " + dosHoras(A.med.hora) : " · modelo" })]), cabeceraF(A, horas, { futuro: true }), recuadrosF(A, horas, x, { top: 4, fila: true })]);
   function rot(d, k) { return k === 0 ? "Mañana" : etiquetaDia({ fecha: d.fecha, desfase: 1 }); }
   var zProx = el("div", { "class": "zona-h zona-prox" }, [el("p", { "class": "bloque-eti", text: "MAÑANA Y DÍAS SIGUIENTES" }),
     el("div", { "class": "mini-dias" }, dias.map(function (d, k) { return miniDiaI(d, rot(d, k), k === 0, sel && d.fecha === sel.fecha); }))]);
@@ -2869,7 +2881,7 @@ function otrosDatosI(A) {
   if (hay(A.viento)) r(10 + A.viento * 1.5, "viento", Math.round(A.viento) + " km/h", A.dir ? "Viento " + A.dir : "Viento", "viento");
   if (hay(a.feelslike_c)) r(10 + (hay(A.temp) ? Math.abs(a.feelslike_c - A.temp) * 8 : 0) + (a.feelslike_c >= 34 || a.feelslike_c <= 3 ? 40 : 0), "termo", Math.round(a.feelslike_c) + "°", "Sensación");
   if (hay(a.dewpoint_c)) r(8 + (a.dewpoint_c >= 18 ? 30 : 0), "humedad", Math.round(a.dewpoint_c) + "°", "Rocío");
-  if (hay(a.pressure_mb)) r(6 + Math.abs(a.pressure_mb - 1013) * 1.5, "presion", String(a.pressure_mb), "hPa");
+  if (hay(ex.cero)) r(6, "monte", fmt(Math.round(ex.cero)) + " m", "Cero térmico");
   if (hay(a.vis_km)) r(a.vis_km < 5 ? 70 : a.vis_km < 10 ? 40 : 6, "ojo", fmt(a.vis_km) + " km", "Visibilidad");
   if (hay(a.uv)) r(hh >= 7 && hh < 19 ? 5 + a.uv * 8 : 5, "sol", String(Math.round(a.uv)), "UV");
   if (as.sale_sol && as.pone_sol) {
@@ -3134,6 +3146,8 @@ function pieAtribucion() {
   if (e) partes.push(" Observaciones: Portal de Información Hídrica de Córdoba (APRHi), " + (e.a.NombreEstacion || e.a.Nombre || "estación") + ", a " + Math.round(e.km) + " km, " +
     new Date(e.a.UltimaActualizacion).toLocaleString("es-AR", { hour12: false, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) + ".");
   else partes.push(" Sin estación de observación en el radio de 25 km: valores del modelo.");
+  var cd = UI.cerca && UI.cerca.datos;
+  if (cd && cd.fuentes) partes.push(" Radar, rayos y focos: " + cd.fuentes + (cd.revisado ? ", revisado " + new Date(cd.revisado).toLocaleTimeString("es-AR", { hour12: false, hour: "2-digit", minute: "2-digit" }) : "") + ".");
   return el("p", { "class": "nota pie-datos" }, partes);
 }
 
