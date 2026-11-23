@@ -695,11 +695,11 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 .fila-i.solo { grid-template-columns: minmax(0, 1fr); }
 .fila-i > .radar-esq { order: 0; grid-column: auto; margin: 0; }
 .otros-i { margin: 0; display: flex; flex-direction: column; }
-.otros-grid { flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; align-content: center; }
+.otros-grid { flex: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 10px; }
 .otro-t { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 18px 8px; border-radius: 12px; background: var(--hoja2); text-align: center; min-width: 0; }
-.otro-t svg { color: var(--tinta3); }
-.otro-v { font-size: 24px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.otro-e { font-size: 13px; color: var(--tinta2); text-transform: capitalize; }
+.otro-t svg { color: var(--tinta3); width: 28px; height: 28px; }
+.otro-v { font-size: 30px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.otro-e { font-size: 14px; color: var(--tinta2); text-transform: capitalize; }
 @media (max-width: 899px) { .fila-i { grid-template-columns: minmax(0, 1fr); } .otros-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 .ventanas-i { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 4fr); margin-top: 6px; }
@@ -2860,6 +2860,7 @@ function otrosDatosI(A) {
   r("termo", hay(a.feelslike_c) ? Math.round(a.feelslike_c) + "°" : null, "Sensación");
   r("humedad", hay(a.dewpoint_c) ? Math.round(a.dewpoint_c) + "°" : null, "Rocío");
   r("presion", hay(a.pressure_mb) ? String(a.pressure_mb) : null, "hPa");
+  r("nube", hay(a.cloud) ? a.cloud + " %" : null, "Nubosidad");
   r("ojo", hay(a.vis_km) ? fmt(a.vis_km) + " km" : null, "Visibilidad");
   r("amanecer", as.sale_sol ? as.sale_sol + " · " + as.pone_sol : null, "Sol");
   r("luna", as.fase ? fmt(as.iluminacion) + " %" : null, as.fase ? String(as.fase) : "Luna");
