@@ -2560,12 +2560,12 @@ function lugarRadar(km, g) { if (km < 1) return "a menos de 1 km"; return "a " +
 function textoTormenta(t) {
   if (!t) return { texto: "Tormenta: sin dato reciente", nivel: null };
   var donde = hay(t.km) ? ": " + lugarRadar(t.km, t.rumbo) : "";
-  var txt = { sin_tormenta: "Sin tormenta a 50 km", acercandose: "Tormenta en aproximación" + donde, cerca: "Tormenta a menos de 20 km" + donde, en_zona: "Tormenta en la zona" + donde }[t.estado];
+  var txt = { sin_tormenta: "Sin tormenta a 60 km", acercandose: "Tormenta en aproximación" + donde, cerca: "Tormenta a menos de 20 km" + donde, en_zona: "Tormenta en la zona" + donde }[t.estado];
   return { texto: txt || "Tormenta: estado " + t.estado, nivel: t.nivel || null };
 }
 function radarEsquema(datos, op) {
   op = op || {};
-  var R = op.radioKm || 50, d = datos || {}, sec = el("section", { "class": "hoja bloque radar-esq", "aria-label": "Tormenta, rayos, radar y focos alrededor del lugar" });
+  var R = op.radioKm || 60, d = datos || {}, sec = el("section", { "class": "hoja bloque radar-esq", "aria-label": "Tormenta, rayos, radar y focos alrededor del lugar" });
   var viejo = d.revisado ? minDesde(d.revisado) : null, est = textoTormenta(d.tormenta);
   var centro = (d.centro && d.centro.nombre) || "La Población";
   sec.appendChild(el("div", { "class": "radar-cab" }, [
@@ -2597,7 +2597,7 @@ function radarEsquema(datos, op) {
     });
   }
   s.appendChild(gb);
-  [10, 20, 30, 50].filter(function (k) { return k <= R; }).forEach(function (k) {
+  [10, 20, 30, 60].filter(function (k) { return k <= R; }).forEach(function (k) {
     s.appendChild(svg("circle", { cx: C, cy: C, r: k * K - (k === R ? 0.75 : 0), fill: "none", stroke: "var(--trazo)", "stroke-width": k === R ? 1.5 : 1 }));
     // El rótulo va sobre el anillo, un poco al este del norte: sobre el eje se pisaba con la N.
     var pr = XY(k - 1.5, 28), t = svg("text", { x: pr[0], y: pr[1] + 4, "font-size": 11, fill: "var(--tinta3)" }); t.textContent = k + " km"; s.appendChild(t);
@@ -2698,15 +2698,15 @@ function radarEsquema(datos, op) {
   function linea(txt, cl) { lineas.push(el("li", { "class": cl || "" }, txt)); }
   if (!ra) linea("Rayos: sin dato reciente");
   else {
-    var cerca50 = (ra.lista || []).filter(function (r) { return r.km <= 50; }), rc = cerca50.slice().sort(function (a, b) { return a.km - b.km; })[0];
+    var cerca50 = (ra.lista || []).filter(function (r) { return r.km <= 60; }), rc = cerca50.slice().sort(function (a, b) { return a.km - b.km; })[0];
     var total = cerca50.reduce(function (s_, r) { return s_ + (r.n || 1); }, 0), contados = cerca50.some(function (r) { return r.n; });
-    linea(rc ? (contados ? total + (total === 1 ? " rayo" : " rayos") + " a 50 km en la última hora" : "Rayos a 50 km en la última hora") + "; el más cercano " + lugarRadar(rc.km, rc.rumbo) + ", " + dosHoras(rc.hora) + "." : "Sin rayos a 50 km en los últimos 60 min");
+    linea(rc ? (contados ? total + (total === 1 ? " rayo" : " rayos") + " a 60 km en la última hora" : "Rayos a 60 km en la última hora") + "; el más cercano " + lugarRadar(rc.km, rc.rumbo) + ", " + dosHoras(rc.hora) + "." : "Sin rayos a 60 km en los últimos 60 min");
   }
   if (op.notaRadar) linea(op.notaRadar);
   else if (!nu) linea("Radar: sin dato reciente");
   else {
     var nc = (nu.lista || []).slice().sort(function (a, b) { return a.km - b.km; })[0];
-    if (!nc || nc.km > 40) linea("Radar: sin núcleos a 40 km" + (nc ? "; el más cercano " + lugarRadar(nc.km, nc.rumbo) : ""));
+    if (!nc || nc.km > 60) linea("Radar: sin núcleos a 60 km" + (nc ? "; el más cercano " + lugarRadar(nc.km, nc.rumbo) : ""));
     else linea(["Núcleo de ", marcado("dbz", nc.dbz, nc.dbz + " dBZ"), " " + lugarRadar(nc.km, nc.rumbo) + (nc.radar ? " (" + nc.radar + ")" : "") + "." + (nc.radares > 1 ? "" : " Radar único: no se puede descartar eco falso.")]);
   }
   if (!fo) linea("Focos de calor: sin dato reciente");
@@ -2729,7 +2729,12 @@ function radarEsquema(datos, op) {
     if (n) sinNada.push(n[1]);
     return !n;
   });
-  if (sinNada.length >= 2) lineas = conAlgo.concat([el("li", { text: "Sin " + sinNada.slice(0, -1).join(", ") + " ni " + sinNada[sinNada.length - 1] + " a 50 km" })]);
+  if (sinNada.length >= 2) {
+    // Rayos y núcleos se miran a 60 km; focos y humo, a 50.
+    var s60 = sinNada.filter(function (n) { return n === "rayos" || n === "núcleos de radar"; }), s50 = sinNada.filter(function (n) { return s60.indexOf(n) < 0; });
+    function ni(a_) { return a_.length > 1 ? a_.slice(0, -1).join(", ") + " ni " + a_[a_.length - 1] : a_[0]; }
+    lineas = conAlgo.concat([el("li", { text: (s60.length ? "Sin " + ni(s60) + " a 60 km" : "") + (s50.length ? (s60.length ? ", ni " : "Sin ") + ni(s50) + " a 50 km" : "") })]);
+  }
   sec.appendChild(el("ul", { "class": "radar-lineas" }, lineas));
   sec.appendChild(el("p", { "class": "f-pie" }, [(d.fuentes || "VPS") + (d.revisado ? " · revisado " + dosHoras(d.revisado) : "") + ".",
     viejo !== null && viejo > 15 ? el("b", { "class": "nivel nivel-amarillo", text: " Dato de hace " + viejo + " min." }) : ""]));
@@ -3034,7 +3039,7 @@ function bandaDelLugar() {
 // Tormenta, rayos y focos alrededor del lugar elegido, de todo el país (VPS, 15/11). Radar y humo, solo alrededor
 // de La Población (cerca.json): los radares del OHMC cubren el centro del país. Todo estático en datos.entresijo.org,
 // en baldosas de 2°: se baja solo lo que toca el círculo. Se pide como mucho cada 5 minutos.
-var DATOS_VPS = "https://datos.entresijo.org/", RADIO_RADAR = 50;
+var DATOS_VPS = "https://datos.entresijo.org/", RADIO_RADAR = 60;
 var radarLeido = { cerca: null, indice: null, focos: null, rayos: {}, base: {}, en: 0, lugar: "" };
 function baldosasDe(lat, lon, km) {
   var dLat = km / 111, dLon = km / (111 * Math.max(Math.cos(lat * Math.PI / 180), 0.2)), out = {};
@@ -3092,7 +3097,7 @@ function armarRadar(lugar) {
   datos.rayos = X.indice ? { hora: X.indice.revisado, lista: hora } : null;
   var cuadros = Object.keys(porTramo).sort().map(function (t) { return { t: t, lista: porTramo[t] }; });
   // Tormenta: en La Población, la del VPS, que es la misma regla del aviso al teléfono. En otro lugar, esa regla
-  // con los rayos: 3 o más a 50 km en 15 min (los dos últimos tramos), o uno a 20 km o menos, o a 10.
+  // con los rayos: 3 o más a 60 km en 15 min (los dos últimos tramos), o uno a 20 km o menos, o a 10.
   if (esLP) datos.tormenta = cer.tormenta;
   else if (X.indice) {
     var rec = hora.filter(function (r) { return ahora - new Date(r.hora).getTime() <= 20 * 60000; });
@@ -3113,7 +3118,7 @@ function armarRadar(lugar) {
   // Focos de todo el país a 50 km del lugar. En La Población, el nivel del VPS (incluye el riesgo de incendio).
   if (X.focos) {
     var fl = (X.focos.focos || []).map(function (f) { var p = rel(f.lat, f.lon); return { km: p.km, rumbo: p.rumbo, mw: f.mw, hora: f.ultima, veces: f.veces }; })
-      .filter(function (f) { return f.km <= R; }).sort(function (a, b) { return a.km - b.km; });
+      .filter(function (f) { return f.km <= 50; }).sort(function (a, b) { return a.km - b.km; });
     datos.focos = { hora: X.focos.imagen, lista: fl, nivel: esLP && cer.focos ? cer.focos.nivel : fl.length ? nivelFoco(fl[0].km, null) : null };
   } else datos.focos = null;
   // La base: rutas y ríos que pasan por el círculo, y localidades adentro, en km desde el centro.
