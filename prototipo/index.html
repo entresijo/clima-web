@@ -730,9 +730,16 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 .otro-e { font-size: 14px; color: var(--tinta2); text-transform: capitalize; }
 @media (max-width: 899px) { .fila-i { grid-template-columns: minmax(0, 1fr); } .otros-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
-.ventanas-i { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 4fr); margin-top: 6px; }
+.ventanas-i { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.2fr); margin-top: 6px; }
+.ventanas-i.con-ayer { grid-template-columns: minmax(110px, .6fr) minmax(0, 2.6fr) minmax(0, 1.8fr); }
+.ventanas-i.con-ayer .vent-izq { grid-column: 1 / 3; }
+.vent-cuerpo { display: flex; min-width: 0; }
+.vent-cuerpo .vent-riel { flex: 1; min-width: 0; }
+.hi.hi-rot { flex: 0 0 22px; padding: 4px 0 8px; color: var(--tinta3); align-items: center; }
+.hi-rot svg { opacity: .7; }
 .vent { min-width: 0; padding-top: 6px; }
-.vent + .vent { border-left: 2px solid var(--trazo); padding-left: 16px; margin-left: 16px; }
+.vent-izq { padding-right: 18px; }
+.vent + .vent { border-left: 1px solid var(--trazo); padding-left: 18px; padding-right: 0; }
 .vent-riel { display: flex; gap: 2px; overflow-x: auto; padding-bottom: 8px; scroll-behavior: smooth; }
 .hi { flex: 0 0 56px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 0 6px; border-radius: 10px; font-size: 13px; }
 .hi small { font-size: 12px; color: var(--tinta2); min-height: 15px; white-space: nowrap; }
@@ -749,7 +756,8 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 .vent .franjas-panel, .vent table.franjas { margin-top: 0; }
 @media (max-width: 720px) {
   .ventanas-i { grid-template-columns: minmax(0, 1fr); }
-  .vent + .vent { border-left: 0; padding-left: 0; margin-left: 0; border-top: 2px solid var(--trazo); margin-top: 10px; padding-top: 10px; }
+  .vent-izq { padding-right: 0; }
+  .vent + .vent { border-left: 0; padding-left: 0; margin-left: 0; border-top: 1px solid var(--trazo); margin-top: 10px; padding-top: 10px; }
 }
 .tc-pasado { opacity: .55; }
 .tiles-h { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 8px; margin-top: 14px; }
@@ -1129,7 +1137,7 @@ function celdaFranja(c, fr, e) {
   // Lo que ya pasó, en un lugar: con estación, la lluvia medida está en Ahora y el modelo no la contradice acá;
   // sin estación, es lo que estima el modelo y lleva "≈" (regla del usuario, 3/11).
   if (e.pasada) { if (c.mm >= 0.1 && !(e.hoy && medicion().medido)) sub.push(el("div", { "class": "fr-sub", text: "≈ " + fmt(Math.round(c.mm * 10) / 10) + " mm" })); }
-  else if (c.prob !== null && c.prob >= 30) sub.push(el("div", { "class": "fr-sub" + (e.pico ? " fr-pico" : "") }, [marcado("prob", c.prob, c.prob + " %"), c.mm >= 1 ? " · " : "", c.mm >= 1 ? marcado("lluvia", c.mm, fmt(Math.round(c.mm * 10) / 10) + " mm") : ""]));
+  else if (c.prob !== null && c.prob >= 30) sub.push(el("div", { "class": "fr-sub" + (e.pico ? " fr-pico" : "") }, [icono("gota", 11), " ", marcado("prob", c.prob, c.prob + " %"), c.mm >= 1 ? " · " : "", c.mm >= 1 ? marcado("lluvia", c.mm, fmt(Math.round(c.mm * 10) / 10) + " mm") : ""]));
   if (c.rafaga >= 50) sub.push(el("div", { "class": "fr-sub" }, ["Ráfaga ", marcado("rafaga", c.rafaga, String(Math.round(c.rafaga)))]));
   return el("td", { "class": cl, title: det }, [el("div", { "class": "fr-temp" }, [icono(ic, 18), marcaTemp(t, Math.round(t) + "°")])].concat(sub));
 }
@@ -2860,7 +2868,7 @@ function tableroI(v, viene, radar, primero) {
     izq = tablaFranjasT(fr, hAhora);
     der = sel ? tablaFranjasT(datosFranjas(iSel, iSel + 1), hAhora) : sinDias;
   }
-  var ventanas = el("div", { "class": "ventanas-i" }, [
+  var ventanas = el("div", { "class": "ventanas-i" + (ay ? " con-ayer" : "") }, [
     el("div", { "class": "vent vent-izq" }, [el("p", { "class": "bloque-eti", text: tituloIzq }), izq]),
     el("div", { "class": "vent vent-der" }, [el("p", { "class": "bloque-eti", text: (nombreSel ? nombreSel.toUpperCase() : "DÍA ELEGIDO") }), der])]);
   var caja = el("section", { "class": "hoja bloque caja-tiempo v-F", "aria-label": "Ahora y los días siguientes" }, [
@@ -2887,7 +2895,11 @@ function ventanaHorasI(V, fechas, ahoraK, hoy, opc) {
   var h = V.horas || {}, mapas = { temp: porHora(h.temp), nube: porHora(h.nube), prob: porHora(h.prob), lluvia: porHora(h.lluvia), hoy: hoy, medida: opc.medida, primera: opc.desdeAhora ? ahoraK : fechas[0] + " 00" }, lista = [];
   fechas.forEach(function (f) { for (var hh = 0; hh < 24; hh++) { if (!opc.desdeAhora || f + " " + ("0" + hh).slice(-2) >= ahoraK) lista.push([f, hh]); } });
   if (opc.max) lista = lista.slice(0, opc.max);
-  return el("div", { "class": "vent-riel", tabindex: "0", role: "group", "aria-label": "Horas, deslizable" }, lista.map(function (x) { return celdaHoraI(x[0], x[1], ahoraK, mapas); }));
+  var nb = String.fromCharCode(160);
+  var rot = el("div", { "class": "hi hi-rot", "aria-hidden": "true" }, [el("small", { "class": "hi-d", text: nb }), el("span", { "class": "hi-h", text: nb }), el("span", { style: "height:20px" }),
+    el("b", { "class": "din", text: nb }), el("small", { title: "Probabilidad de lluvia" }, [icono("gota", 13)]), el("small", { title: "Lluvia esperada, en mm" }, [icono("pluviometro", 13)])]);
+  var riel = el("div", { "class": "vent-riel", tabindex: "0", role: "group", "aria-label": "Horas, deslizable" }, lista.map(function (x) { return celdaHoraI(x[0], x[1], ahoraK, mapas); }));
+  return el("div", { "class": "vent-cuerpo" }, [rot, riel]);
 }
 function miniDiaI(d, rotulo, primero, elegido) {
   return el("button", { "class": "md-btn", "aria-pressed": String(elegido), "aria-label": "Ver " + rotulo + " por hora o por franjas", onclick: function () { UI.diaSel = d.fecha; pintarVista(); } }, [miniDia(d, rotulo, primero)]);
