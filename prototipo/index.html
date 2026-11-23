@@ -698,6 +698,8 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 .otros-grid { flex: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 10px; }
 .otro-t { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 18px 8px; border-radius: 12px; background: var(--hoja2); text-align: center; min-width: 0; }
 .otro-t svg { color: var(--tinta3); width: 28px; height: 28px; }
+.otro-t.alto { box-shadow: inset 0 0 0 2px var(--n-amarillo); }
+.otro-t.alto svg { color: var(--n-amarillo); }
 .otro-v { font-size: 30px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .otro-e { font-size: 14px; color: var(--tinta2); text-transform: capitalize; }
 @media (max-width: 899px) { .fila-i { grid-template-columns: minmax(0, 1fr); } .otros-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -2520,6 +2522,7 @@ function recuadrosF(A, horas, x, op) {
     // Una fila de celdas iguales a todo el ancho, en orden de relevancia: nada queda flotando. Lo que cruzó su umbral
     // se marca con el color de su nivel, como en el resto del panel.
     var orden = arriba.concat(abajo).sort(function (a, b) { return b.score - a.score; }).slice(0, op.top || 6);
+    recuadrosF.mostrados = orden.map(function (r) { return r.ic; });
     if (!orden.length) return null;
     return el("div", { "class": "ind-fila", role: "list", "aria-label": "Indicadores, del más relevante al menos" }, orden.map(function (r) {
       return el("div", { "class": "ind-celda" + (r.nivel ? " nv-" + r.nivel : ""), role: "listitem" }, [icono(r.ic, 20),
@@ -2856,18 +2859,31 @@ function miniDiaI(d, rotulo, primero, elegido) {
   return el("button", { "class": "md-btn", "aria-pressed": String(elegido), "aria-label": "Ver " + rotulo + " por hora o por franjas", onclick: function () { UI.diaSel = d.fecha; pintarVista(); } }, [miniDia(d, rotulo, primero)]);
 }
 function otrosDatosI(A) {
-  var V = vivoV(), a = V.actual || {}, as = V.astro || {}, t = [];
-  function r(ic, val, eti) { if (hay(val) && val !== "") t.push(el("div", { "class": "otro-t" }, [icono(ic, 22), el("div", { "class": "otro-v din" }, val), el("div", { "class": "otro-e", text: eti })])); }
-  r("viento", hay(A.viento) ? Math.round(A.viento) + " km/h" : null, A.dir ? "Viento " + A.dir : "Viento");
-  r("termo", hay(a.feelslike_c) ? Math.round(a.feelslike_c) + "°" : null, "Sensación");
-  r("humedad", hay(a.dewpoint_c) ? Math.round(a.dewpoint_c) + "°" : null, "Rocío");
-  r("presion", hay(a.pressure_mb) ? String(a.pressure_mb) : null, "hPa");
-  r("nube", hay(a.cloud) ? a.cloud + " %" : null, "Nubosidad");
-  r("ojo", hay(a.vis_km) ? fmt(a.vis_km) + " km" : null, "Visibilidad");
-  r("amanecer", as.sale_sol ? as.sale_sol + " · " + as.pone_sol : null, "Sol");
-  r("luna", as.fase ? fmt(as.iluminacion) + " %" : null, as.fase ? String(as.fase) : "Luna");
+  var V = vivoV(), a = V.actual || {}, q = V.aire || {}, as = V.astro || {}, ex = extrasDeHoras(V), t = [], arriba = recuadrosF.mostrados || [];
+  var hh = new Date(V.capturado).getHours(), hm = hh * 60 + new Date(V.capturado).getMinutes();
+  function aMin(x) { return parseInt(x.slice(0, 2), 10) * 60 + parseInt(x.slice(3, 5), 10); }
+  function r(peso, ic, val, eti, ya) { if (hay(val) && val !== "" && !(ya && arriba.indexOf(ya) >= 0)) t.push({ peso: peso, ic: ic, val: val, eti: eti }); }
+  if (hay(A.viento)) r(10 + A.viento * 1.5, "viento", Math.round(A.viento) + " km/h", A.dir ? "Viento " + A.dir : "Viento", "viento");
+  if (hay(a.feelslike_c)) r(10 + (hay(A.temp) ? Math.abs(a.feelslike_c - A.temp) * 8 : 0) + (a.feelslike_c >= 34 || a.feelslike_c <= 3 ? 40 : 0), "termo", Math.round(a.feelslike_c) + "°", "Sensación");
+  if (hay(a.dewpoint_c)) r(8 + (a.dewpoint_c >= 18 ? 30 : 0), "humedad", Math.round(a.dewpoint_c) + "°", "Rocío");
+  if (hay(a.pressure_mb)) r(6 + Math.abs(a.pressure_mb - 1013) * 1.5, "presion", String(a.pressure_mb), "hPa");
+  if (hay(a.cloud)) r(8, "nube", a.cloud + " %", "Nubosidad");
+  if (hay(a.vis_km)) r(a.vis_km < 5 ? 70 : a.vis_km < 10 ? 40 : 6, "ojo", fmt(a.vis_km) + " km", "Visibilidad");
+  if (hay(A.hum)) r(8 + (A.hum < 25 || A.hum > 90 ? 35 : 0), "humedad", fmt(A.hum) + " %", "Humedad", "humedad");
+  if (hay(a.uv) && hh >= 7 && hh < 19) r(5 + a.uv * 8, "sol", String(Math.round(a.uv)), "UV " + nivelUV(a.uv).toLowerCase(), "sol");
+  if (hay(q.epa)) r(6 + (q.epa >= 2 ? 25 * (q.epa - 1) : 0), "hoja", String(AIRE_EPA[q.epa] || q.epa), "Aire", "hoja");
+  if (hay(ex.cero)) r(6, "monte", fmt(Math.round(ex.cero)) + " m", "Cero térmico");
+  if (as.sale_sol && as.pone_sol) {
+    var dia_ = hm < aMin(as.pone_sol) && hm >= aMin(as.sale_sol), falta = (aMin(dia_ ? as.pone_sol : as.sale_sol) - hm + 1440) % 1440;
+    r(falta <= 120 ? 45 : 8, "amanecer", as.sale_sol + " · " + as.pone_sol, "Sol");
+  }
+  if (as.fase) r(as.iluminacion >= 95 || as.iluminacion <= 5 ? 14 : 5, "luna", fmt(as.iluminacion) + " %", String(as.fase));
+  t.sort(function (x, y) { return y.peso - x.peso; });
+  var tiles = t.slice(0, 8).map(function (d) {
+    return el("div", { "class": "otro-t" + (d.peso >= 50 ? " alto" : "") }, [icono(d.ic, 22), el("div", { "class": "otro-v din" }, d.val), el("div", { "class": "otro-e", text: d.eti })]);
+  });
   return el("section", { "class": "hoja bloque otros-i", "aria-label": "Otros datos, del modelo" }, [
-    el("p", { "class": "bloque-eti" }, ["OTROS DATOS ", el("span", { text: "· modelo" })]), el("div", { "class": "otros-grid" }, t)]);
+    el("p", { "class": "bloque-eti" }, ["OTROS DATOS ", el("span", { text: "· modelo" })]), el("div", { "class": "otros-grid" }, tiles)]);
 }
 function pieI(A) {
   var t = A.med.medido ? "Observación: " + A.med.fuente + (hay(A.med.km) ? ", a " + Math.round(A.med.km) + " km" : "") + ", " + dosHoras(A.med.hora) + "." : "Sin observación cercana: valores del modelo.";
