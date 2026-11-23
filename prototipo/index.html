@@ -2855,7 +2855,7 @@ function otrosDatosI(A) {
   f("Índice UV", hay(uv) && uv < 3 ? fmt(Math.round(uv)) : null, hay(uv) && uv < 3 ? nivelUV(uv).toLowerCase() : "");
   f("Calidad del aire", hay(epa) && epa < 2 ? String(AIRE_EPA[epa] || epa) : null);
   f("Cero térmico", hay(ex.cero) ? fmt(Math.round(ex.cero)) + " m" : null);
-  f("Sol", as.sale_sol ? as.sale_sol + " · " + as.pone_sol : null, "sale · se pone");
+  f("Salida y puesta del sol", as.sale_sol ? as.sale_sol + " · " + as.pone_sol : null);
   f("Luna", as.fase ? fmt(as.iluminacion) + " %" : null, as.fase ? String(as.fase).toLowerCase() : "");
   return el("section", { "class": "hoja bloque otros-i", "aria-label": "Otros datos" }, [el("p", { "class": "bloque-eti", text: "OTROS DATOS" }),
     el("dl", { "class": "otros-lista" }, filas.map(function (r) { return el("div", { "class": "otro" }, [el("dt", { text: r[0] }), el("dd", { "class": "din" }, [r[1], r[2] ? el("small", { text: " " + r[2] }) : null])]); })),
