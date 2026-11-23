@@ -704,7 +704,7 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 .f-presion svg { color: var(--tinta3); }
 .fila-i { grid-template-columns: minmax(320px, 520px) minmax(0, 1fr); }
 .fila-i > .radar-esq > .f-pie { display: none; }
-.otros-grid { grid-auto-rows: auto; align-content: center; gap: 8px; }
+.otros-grid { grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); grid-auto-rows: auto; align-content: start; gap: 8px; }
 .otro-t { padding: 12px 6px; gap: 4px; }
 .otro-v { font-size: 21px; }
 .otro-t svg { width: 20px; height: 20px; }
@@ -1388,7 +1388,7 @@ function vistaLugar(v) {
     el("p", { "class": "bloque-eti" }, ["PRÓXIMOS DÍAS ", el("span", { text: "· pronóstico de Open-Meteo" })]),
     dias.length ? tablaDias(dias) : el("p", { "class": "nota", text: "Sin pronóstico por días para este lugar." })]);
   tableroDias(v, bloqueAhoraLocalidad, sv);
-  v.appendChild(tiraDatos());
+  if (varianteActual() !== "I") v.appendChild(tiraDatos());
 }
 function pieFuentes() {
   var a = el("a", { href: "https://open-meteo.com/", rel: "noopener", target: "_blank", text: "Open-Meteo.com" });
@@ -2874,26 +2874,33 @@ function miniDiaI(d, rotulo, primero, elegido) {
   return el("button", { "class": "md-btn", "aria-pressed": String(elegido), "aria-label": "Ver " + rotulo + " por hora o por franjas", onclick: function () { UI.diaSel = d.fecha; pintarVista(); } }, [miniDia(d, rotulo, primero)]);
 }
 function otrosDatosI(A) {
-  var V = vivoV(), a = V.actual || {}, q = V.aire || {}, as = V.astro || {}, ex = extrasDeHoras(V), t = [], arriba = [];
-  var hh = new Date(V.capturado).getHours(), hm = hh * 60 + new Date(V.capturado).getMinutes();
+  var V = vivoV(), a = V.actual || {}, q = V.aire || {}, as = V.astro || {}, ex = extrasDeHoras(V), t = [];
+  var hh = new Date(V.capturado).getHours(), hm = hh * 60 + new Date(V.capturado).getMinutes(), est = UI.estacion && UI.estacion.a;
   function aMin(x) { return parseInt(x.slice(0, 2), 10) * 60 + parseInt(x.slice(3, 5), 10); }
-  function r(peso, ic, val, eti, ya) { if (hay(val) && val !== "" && !(ya && arriba.indexOf(ya) >= 0)) t.push({ peso: peso, ic: ic, val: val, eti: eti }); }
-  if (hay(A.viento)) r(10 + A.viento * 1.5, "viento", Math.round(A.viento) + " km/h", A.dir ? "Viento " + A.dir : "Viento", "viento");
-  if (hay(a.feelslike_c)) r(10 + (hay(A.temp) ? Math.abs(a.feelslike_c - A.temp) * 8 : 0) + (a.feelslike_c >= 34 || a.feelslike_c <= 3 ? 40 : 0), "termo", Math.round(a.feelslike_c) + "°", "Sensación");
-  if (hay(a.dewpoint_c)) r(8 + (a.dewpoint_c >= 18 ? 30 : 0), "humedad", Math.round(a.dewpoint_c) + "°", "Rocío");
-  if (hay(ex.cero)) r(6, "monte", fmt(Math.round(ex.cero)) + " m", "Cero térmico");
-  if (hay(a.vis_km)) r(a.vis_km < 5 ? 70 : a.vis_km < 10 ? 40 : 6, "ojo", fmt(a.vis_km) + " km", "Visibilidad");
-  if (hay(a.uv)) r(hh >= 7 && hh < 19 ? 5 + a.uv * 8 : 5, "sol", String(Math.round(a.uv)), "UV");
+  function r(peso, ic, val, eti) { if (hay(val) && val !== "") t.push({ peso: peso, ic: ic, val: val, eti: eti }); }
+  r(hay(A.viento) ? 10 + A.viento * 1.5 : 0, "viento", hay(A.viento) ? Math.round(A.viento) + " km/h" : null, A.dir ? "Viento " + A.dir : "Viento");
+  r(hay(A.hum) ? 8 + (A.hum < 25 || A.hum > 90 ? 42 : 0) : 0, "humedad", hay(A.hum) ? fmt(A.hum) + " %" : null, "Humedad");
+  r(hay(a.feelslike_c) ? 10 + (hay(A.temp) ? Math.abs(a.feelslike_c - A.temp) * 8 : 0) + (a.feelslike_c >= 34 || a.feelslike_c <= 3 ? 40 : 0) : 0, "termo", hay(a.feelslike_c) ? Math.round(a.feelslike_c) + "°" : null, "Sensación");
+  r(hay(a.dewpoint_c) ? 8 + (a.dewpoint_c >= 18 ? 30 : 0) : 0, "humedad", hay(a.dewpoint_c) ? Math.round(a.dewpoint_c) + "°" : null, "Rocío");
+  r(hh >= 7 && hh < 19 && hay(a.uv) ? 5 + a.uv * 8 : 5, "sol", hay(a.uv) ? String(Math.round(a.uv)) : null, "UV");
+  r(hay(q.epa) ? 6 + (q.epa >= 2 ? 25 * (q.epa - 1) : 0) : 0, "hoja", hay(q.epa) ? String(AIRE_EPA[q.epa] || q.epa) : null, "Aire");
+  r(8, "nube", hay(a.cloud) ? a.cloud + " %" : null, "Nubosidad");
+  r(hay(a.vis_km) ? (a.vis_km < 5 ? 70 : a.vis_km < 10 ? 40 : 6) : 0, "ojo", hay(a.vis_km) ? fmt(a.vis_km) + " km" : null, "Visibilidad");
+  r(6, "monte", hay(ex.cero) ? fmt(Math.round(ex.cero)) + " m" : null, "Cero térmico");
+  r(hay(ex.cape) ? (ex.cape >= umbral("OM_CAPE_TORMENTA") ? 60 : 8) : 0, "rayo", hay(ex.cape) ? nivelCAPE(ex.cape) : null, "Energía de tormenta");
+  r(hay(ex.suelo) ? (ex.suelo <= 2 ? 60 : 6) : 0, "suelo", hay(ex.suelo) ? fmt(Math.round(ex.suelo * 10) / 10) + "°" : null, "Suelo, mínima");
+  r(est && typeof est.Lluvia_mm_7dias === "number" ? 8 + est.Lluvia_mm_7dias : 0, "pluviometro", est && typeof est.Lluvia_mm_7dias === "number" ? fmt(est.Lluvia_mm_7dias) + " mm" : null, "Lluvia, 7 días");
   if (as.sale_sol && as.pone_sol) {
     var dia_ = hm < aMin(as.pone_sol) && hm >= aMin(as.sale_sol), falta = (aMin(dia_ ? as.pone_sol : as.sale_sol) - hm + 1440) % 1440;
     r(falta <= 120 ? 45 : 8, "amanecer", as.sale_sol + " · " + as.pone_sol, "Sol");
   }
   if (as.fase) r(as.iluminacion >= 95 || as.iluminacion <= 5 ? 14 : 5, "luna", fmt(as.iluminacion) + " %", String(as.fase));
+  // Lista fija: mismo orden siempre. El peso solo decide cuáles se encienden (desde 50) y cuáles quedan en normal.
   var tiles = t.map(function (d) {
     return el("div", { "class": "otro-t" + (d.peso >= 50 ? " alto" : " normal") }, [icono(d.ic, 22), el("div", { "class": "otro-v din" }, d.val), el("div", { "class": "otro-e", text: d.eti })]);
   });
-  return el("section", { "class": "hoja bloque otros-i", "aria-label": "Otros datos, del modelo" }, [
-    el("p", { "class": "bloque-eti" }, ["OTROS DATOS ", el("span", { text: "· modelo" })]), el("div", { "class": "otros-grid" }, tiles)]);
+  return el("section", { "class": "hoja bloque otros-i", "aria-label": "Datos, del modelo" }, [
+    el("p", { "class": "bloque-eti" }, ["DATOS ", el("span", { text: "· modelo" })]), el("div", { "class": "otros-grid" }, tiles)]);
 }
 function pieI(A) {
   var t = A.med.medido ? "Observación: " + A.med.fuente + (hay(A.med.km) ? ", a " + Math.round(A.med.km) + " km" : "") + ", " + dosHoras(A.med.hora) + "." : "Sin observación cercana: valores del modelo.";
