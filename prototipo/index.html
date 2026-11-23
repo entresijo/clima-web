@@ -675,6 +675,18 @@ pre.log { font-size: 12px; line-height: 1.5; max-height: 62vh; overflow: auto; b
 .caja-tiempo .franjas-panel { border: 0; background: none; padding: 0; margin-top: 10px; }
 .caja-tiempo .franjas-panel > .bloque-eti { display: none; }
 
+.zona-ahora .ind-fila { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.zona-ahora .ind-celda:nth-child(odd) { border-left: 0; padding-left: 0; }
+.fila-i { display: grid; grid-template-columns: minmax(300px, 420px) minmax(0, 1fr); gap: 12px; align-items: start; margin-bottom: 12px; }
+.fila-i.solo { grid-template-columns: minmax(0, 1fr); }
+.fila-i > .radar-esq { order: 0; grid-column: auto; margin: 0; }
+.otros-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0 20px; margin: 0; }
+.otro { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--trazo); }
+.otro dt { color: var(--tinta2); font-size: 14px; }
+.otro dd { margin: 0; font-size: 16px; font-weight: 600; text-align: right; }
+.otro dd small { font-weight: 400; font-size: 12px; color: var(--tinta2); }
+@media (max-width: 899px) { .fila-i { grid-template-columns: minmax(0, 1fr); } }
+
 .ventanas-i { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 4fr); margin-top: 6px; }
 .vent { min-width: 0; padding-top: 6px; }
 .vent + .vent { border-left: 2px solid var(--trazo); padding-left: 16px; margin-left: 16px; }
@@ -2771,7 +2783,7 @@ function tableroI(v, viene, radar, primero) {
     ay && ay.max !== null ? el("div", { "class": "za-temp din" }, [marcado("calor", ay.max, Math.round(ay.max) + "°"), el("small", {}, [" / ", marcado("frio", ay.min, Math.round(ay.min) + "°")])]) : el("p", { "class": "nota", text: "Sin datos de ayer." }),
     ay ? el("div", { "class": "za-linea" }, [icono("pluviometro", 16), ay.mm >= 0.1 ? marcado("lluvia", ay.mm, mm1(ay.mm)) : "sin lluvia"]) : null,
     ay && ay.rafaga >= 30 ? el("div", { "class": "za-linea" }, [icono("viento", 16), "ráfagas ", marcado("rafaga", ay.rafaga, Math.round(ay.rafaga) + " km/h")]) : null]);
-  var zAhora = el("div", { "class": "zona-h zona-ahora" }, [el("p", { "class": "bloque-eti", text: "AHORA" }), cabeceraF(A, horas)]);
+  var zAhora = el("div", { "class": "zona-h zona-ahora" }, [el("p", { "class": "bloque-eti", text: "AHORA" }), cabeceraF(A, horas), recuadrosF(A, horas, x, { top: 4, fila: true }), pieI(A)]);
   function rot(d, k) { return k === 0 ? "Mañana" : etiquetaDia({ fecha: d.fecha, desfase: 1 }); }
   var zProx = el("div", { "class": "zona-h" }, [el("p", { "class": "bloque-eti", text: movil ? "MAÑANA" : "MAÑANA Y DÍAS SIGUIENTES" }),
     el("div", { "class": "mini-dias" }, (movil ? dias.slice(0, 1) : dias).map(function (d, k) { return miniDiaI(d, rot(d, k), k === 0, sel && d.fecha === sel.fecha); }))]);
@@ -2784,7 +2796,7 @@ function tableroI(v, viene, radar, primero) {
   var izq, der;
   if (modo === "hora") {
     izq = ventanaHorasI(V, [ayerK, hoyK], ahoraK, hoyK, 24 + hAhora);
-    der = sel ? ventanaHorasI(V, [sel.fecha], ahoraK, hoyK, 6) : el("p", { "class": "nota", text: "Sin pronóstico de los días siguientes." });
+    der = sel ? ventanaHorasI(V, [sel.fecha], ahoraK, hoyK, 0) : el("p", { "class": "nota", text: "Sin pronóstico de los días siguientes." });
   } else {
     izq = tablaFranjasT(datosFranjas(-1, 1), hAhora);
     der = sel ? tablaFranjasT(datosFranjas(iSel, iSel + 1), hAhora) : el("p", { "class": "nota", text: "Sin pronóstico de los días siguientes." });
@@ -2797,21 +2809,21 @@ function tableroI(v, viene, radar, primero) {
     movil && dias.length > 1 ? el("div", { "class": "detalle-h" }, [el("p", { "class": "bloque-eti", text: "DÍAS SIGUIENTES" }),
       el("div", { "class": "mini-dias" }, dias.slice(1).map(function (d, k) { return miniDiaI(d, rot(d, k + 1), false, sel && d.fecha === sel.fecha); }))]) : null,
     el("div", { "class": "detalle-h" }, [el("div", { "class": "th-cab" }, [el("p", { "class": "bloque-eti", text: modo === "hora" ? "POR HORA" : "POR FRANJAS" }), seg]), ventanas]),
-    recuadrosF(A, horas, x, { top: 6, fila: true }), pieF(A),
-    el("p", { "class": "f-pie", text: "Lo anterior a ahora lo estima el modelo: no es medición. Tocá un día para ver sus horas o sus franjas." })]);
+    el("p", { "class": "f-pie", text: "Horas anteriores a la actual: modelo, no observadas." })]);
   if (radar && primero) { radar.classList.add("primero"); v.appendChild(radar); }
   v.appendChild(caja);
-  if (radar && !primero) v.appendChild(radar);
+  // Radar a la izquierda y otros datos al lado, en una sola franja.
+  v.appendChild(el("div", { "class": "fila-i" + (radar && !primero ? "" : " solo") }, [radar && !primero ? radar : null, otrosDatosI(A)]));
 }
 function celdaHoraI(V, fecha, hh, ahoraK, mapas) {
   var k = fecha + " " + ("0" + hh).slice(-2), t = mapas.temp[k], nu = mapas.nube[k], pr = mapas.prob[k], mm = mapas.lluvia[k];
   var noche = hh < 7 || hh >= 20, lluvia = hay(pr) && pr >= 50 && hay(mm) && mm >= 0.3, cl = hay(nu) ? claseCielo(nu) : "parcial";
   var ic = lluvia ? "lluvia" : (cl === "despejado" || cl === "algo") ? (noche ? "luna" : "sol") : "nube";
   var esAhora = k === ahoraK, pasado = k < ahoraK, dia = hh === 0 || k === mapas.primera ? etiquetaDia({ fecha: fecha, desfase: fecha === mapas.hoy ? 0 : (fecha < mapas.hoy ? -1 : 1) }) : "";
-  var sub = hay(pr) && pr >= 30 ? marcado("prob", pr, pr + " %") : (hay(mm) && mm >= 0.1 ? marcado("lluvia", mm, fmt(Math.round(mm * 10) / 10)) : "");
+  var fProb = !pasado && hay(pr) && pr >= 10 ? marcado("prob", pr, pr + " %") : "", fMm = hay(mm) && mm >= 0.1 ? marcado("lluvia", mm, fmt(Math.round(mm * 10) / 10) + " mm") : "";
   return el("div", { "class": "hi" + (esAhora ? " hi-ahora" : "") + (pasado ? " tc-pasado" : "") + (hh === 0 ? " hi-corte" : ""), title: k.slice(8, 10) + "/" + k.slice(5, 7) + ", " + hh + " h" }, [
     el("small", { "class": "hi-d", text: dia }), el("span", { "class": "hi-h", text: esAhora ? "Ahora" : hh + " h" }), icono(ic, 20),
-    el("b", { "class": "din" }, hay(t) ? marcaTemp(t, Math.round(t) + "°") : "—"), el("small", {}, sub)]);
+    el("b", { "class": "din" }, hay(t) ? marcaTemp(t, Math.round(t) + "°") : "—"), el("small", {}, fProb), el("small", {}, fMm)]);
 }
 function ventanaHorasI(V, fechas, ahoraK, hoy, centrarEn) {
   var h = V.horas || {}, mapas = { temp: porHora(h.temp), nube: porHora(h.nube), prob: porHora(h.prob), lluvia: porHora(h.lluvia), hoy: hoy, primera: fechas[0] + " 00" }, celdas = [];
@@ -2830,6 +2842,29 @@ function ventanaHorasI(V, fechas, ahoraK, hoy, centrarEn) {
 }
 function miniDiaI(d, rotulo, primero, elegido) {
   return el("button", { "class": "md-btn", "aria-pressed": String(elegido), "aria-label": "Ver " + rotulo + " por hora o por franjas", onclick: function () { UI.diaSel = d.fecha; pintarVista(); } }, [miniDia(d, rotulo, primero)]);
+}
+function otrosDatosI(A) {
+  var V = vivoV(), a = V.actual || {}, q = V.aire || {}, as = V.astro || {}, ex = extrasDeHoras(V), uv = a.uv, epa = q.epa, filas = [];
+  function f(eti, val, sub) { if (hay(val) && val !== "") filas.push([eti, val, sub || ""]); }
+  f("Viento", hay(A.viento) ? Math.round(A.viento) + " km/h" : null, A.dir || "");
+  f("Sensación", hay(a.feelslike_c) ? fmt(Math.round(a.feelslike_c)) + "°" : null);
+  f("Punto de rocío", hay(a.dewpoint_c) ? fmt(Math.round(a.dewpoint_c)) + "°" : null);
+  f("Presión", hay(a.pressure_mb) ? fmt(a.pressure_mb) + " hPa" : null);
+  f("Nubosidad", hay(a.cloud) ? fmt(a.cloud) + " %" : null);
+  f("Visibilidad", hay(a.vis_km) ? fmt(a.vis_km) + " km" : null);
+  f("Índice UV", hay(uv) && uv < 3 ? fmt(Math.round(uv)) : null, hay(uv) && uv < 3 ? nivelUV(uv).toLowerCase() : "");
+  f("Calidad del aire", hay(epa) && epa < 2 ? String(AIRE_EPA[epa] || epa) : null);
+  f("Cero térmico", hay(ex.cero) ? fmt(Math.round(ex.cero)) + " m" : null);
+  f("Sol", as.sale_sol ? as.sale_sol + " · " + as.pone_sol : null, "sale · se pone");
+  f("Luna", as.fase ? fmt(as.iluminacion) + " %" : null, as.fase ? String(as.fase).toLowerCase() : "");
+  return el("section", { "class": "hoja bloque otros-i", "aria-label": "Otros datos" }, [el("p", { "class": "bloque-eti", text: "OTROS DATOS" }),
+    el("dl", { "class": "otros-lista" }, filas.map(function (r) { return el("div", { "class": "otro" }, [el("dt", { text: r[0] }), el("dd", { "class": "din" }, [r[1], r[2] ? el("small", { text: " " + r[2] }) : null])]); })),
+    el("p", { "class": "f-pie", text: "Valores del modelo (Open-Meteo), no observados." })]);
+}
+function pieI(A) {
+  var t = A.med.medido ? "Observación: " + A.med.fuente + (hay(A.med.km) ? ", a " + Math.round(A.med.km) + " km" : "") + ", " + dosHoras(A.med.hora) + "." : "Sin observación cercana: valores del modelo.";
+  if (A.med.medido && hay(A.temp) && hay(A.modelo) && Math.abs(Math.round(A.temp - A.modelo)) >= 3) t += " Modelo: " + Math.round(A.modelo) + "°.";
+  return el("p", { "class": "f-pie", text: t });
 }
 var ICONOS = {
   humedad: ["M12 3.5s6.5 7 6.5 11.5a6.5 6.5 0 0 1-13 0C5.5 10.5 12 3.5 12 3.5z"],
@@ -3068,6 +3103,17 @@ function pieAlertas() {
     (n ? "." : ". Sin alertas del SMN para este lugar.") + (alertasLeidas.fallo ? " La última consulta falló: se muestra la anterior." : "") });
 }
 var capturadoEn = 0;
+// Atribución en un solo bloque y en términos técnicos: quien quiera el detalle lo busca en la fuente citada.
+function pieAtribucion() {
+  var V = UI.locVivo || {}, e = UI.estacion, partes = [];
+  partes.push("Pronóstico: ", el("a", { href: "https://open-meteo.com/", rel: "noopener", target: "_blank", text: "Open-Meteo.com" }), " (",
+    el("a", { href: "https://creativecommons.org/licenses/by/4.0/", rel: "noopener", target: "_blank", text: "CC BY 4.0" }), "), modelo ICON (DWD) para temperatura y best_match para el resto.");
+  if (V.empalme) partes.push(" Temperatura horaria: ICON con ajuste por observación de las " + V.empalme.hora + " (" + fmt(V.empalme.dif) + " °C), ponderación lineal decreciente a 12 h.");
+  if (e) partes.push(" Observaciones: Portal de Información Hídrica de Córdoba (APRHi), " + (e.a.NombreEstacion || e.a.Nombre || "estación") + ", a " + Math.round(e.km) + " km, " +
+    new Date(e.a.UltimaActualizacion).toLocaleString("es-AR", { hour12: false, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) + ".");
+  else partes.push(" Sin estación de observación en el radio de 25 km: valores del modelo.");
+  return el("p", { "class": "nota pie-datos" }, partes);
+}
 
 // Fase e iluminación por la fórmula de baja precisión de Meeus, la misma de panel.py.
 function faseLunar(cuando) {
@@ -3161,8 +3207,7 @@ function pintar() {
   var g = el("section", { "class": "hoja bloque", style: "margin-top:12px", "aria-label": "Gráfico" });
   v.appendChild(g);
   grafico(g);
-  v.appendChild(pieFuentes());
-  if (UI.locVivo && UI.locVivo.empalme) v.appendChild(el("p", { "class": "nota pie-datos", text: "Temperatura por hora: modelo ICON, empalmado desde lo medido a las " + UI.locVivo.empalme.hora + " (ajuste de " + fmt(UI.locVivo.empalme.dif) + "°, con peso que se desvanece en 12 h)." }));
+  v.appendChild(pieAtribucion());
   v.appendChild(pieAlertas());
 }
 function pintarLeido() {
