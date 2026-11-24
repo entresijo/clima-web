@@ -2165,7 +2165,12 @@ function datosAhora() {
   var sabe = med.medido && hay(med.lluvia_20), mide = sabe && med.lluvia_20 > 0, hacePoco = sabe && !mide && med.lluvia_1h > 0, modeloLlueve = llueve;
   llueve = mide;
   var cieloTxt = !modeloLlueve || mide ? (a.condicion || "") : sabe ? (CIELO[clase] || "Nublado") : (a.condicion || "") + ", según el modelo";
-  return { temp: med.medido && hay(med.temp) ? med.temp : a.temp_c, med: med, cielo: cieloTxt, icono: iconoCielo(clase, mide || (modeloLlueve && !sabe) ? "lluvia" : ""), hum: a.humidity,
+  // Lo observado le gana al modelo: con tormenta según el VPS (nivel de cerca.json) o un rayo a 30 km o menos en los últimos
+  // 20 min, el cielo no puede decir "Despejado". El 22/11 decía "Despejado" con 453 rayos a 60 km (pregunta del usuario, 23/11).
+  var dc = UI.cerca && UI.cerca.datos, niv = dc && dc.tormenta && dc.tormenta.nivel, rayoCerca = dc && dc.rayos && (dc.rayos.lista || []).some(function (r) { var m = minDesde(r.hora); return r.km <= 30 && m !== null && m <= 20; });
+  var tor = niv === "rojo" ? "Tormenta en la zona" : niv === "naranja" || rayoCerca ? "Tormenta cerca" : niv ? "Tormenta en aproximación" : "";
+  if (tor) { cieloTxt = tor; clase = "tormenta"; }
+  return { temp: med.medido && hay(med.temp) ? med.temp : a.temp_c, med: med, cielo: cieloTxt, icono: tor ? "rayo" : iconoCielo(clase, mide || (modeloLlueve && !sabe) ? "lluvia" : ""), hum: a.humidity,
     lluviaModelo: modeloLlueve && !mide && !hacePoco, sinLluviaMedida: sabe && !mide, lluviaHora: hacePoco ? med.lluvia_1h : null,
     viento: med.medido && hay(med.viento) ? med.viento : a.wind_kph, vientoMedido: med.medido && hay(med.viento), dir: a.wind_dir ? "del " + a.wind_dir : "",
     rafaga: a.gust_kph, presion: a.pressure_mb, llovio: med.medido && hay(med.lluvia_dia) ? med.lluvia_dia : llovio, lloviendo: llueve, modelo: a.temp_c };
