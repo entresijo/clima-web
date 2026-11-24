@@ -132,6 +132,9 @@ button { cursor: pointer; }
 .dato-txt { flex: 1; min-width: 0; }
 .dato-txt .ind-eti { font-size: 13px; }
 .dato-sub { font-size: 12px; color: var(--tinta3); line-height: 1.25; }
+.banco-form { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; margin: 8px 0; }
+.banco-form label { font-size: 13px; color: var(--tinta2); display: flex; flex-direction: column; gap: 2px; }
+.banco-vigente td { font-weight: 700; background: var(--hoja2); }
 .selector-diseno { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
 .origen { font-size: 11px; font-weight: 400; color: var(--tinta3); }
 .origen-medido { color: var(--ok); }
@@ -1051,7 +1054,7 @@ function tiraDatos() {
       : "Rayos: ninguno a 50 km en los últimos " + (ry.ventana_min || 15) + " min";
     var lRadar = !rd ? "Radar: sin datos de los últimos 40 min" : rc ? ["Radar: núcleo de ", marcado("dbz", rc.nucleo_dbz, rc.nucleo_dbz + " dBZ"), " a " + Math.round(rc.nucleo_km) + " km" + (rc.rumbo ? " al " + rc.rumbo : "") + ", " + rd.cercano + (rc.tendencia ? " · " + rc.tendencia : "")]
       : "Radar: ningún núcleo a 40 km o menos";
-    var claveT = clave("Viene de", "la capa del VPS: rayos del GOES-19 (GLM) en 15 min y radar del OHMC (WebMet) cada 10 min", "Niveles", "los calcula el VPS. Amarillo: en aproximación, 3 o más rayos a 50 km en 15 min o núcleo a 40 km en dos imágenes; naranja: a 20 km o menos; rojo: en la zona, a 10 km o menos. El radar solo da como mucho amarillo: para naranja o rojo hace falta un rayo o dos radares",
+    var claveT = clave("Viene de", "la capa del VPS: rayos del GOES-19 (GLM) en 15 min y radar del OHMC (WebMet) cada 10 min", "Niveles", "los calcula el VPS. Amarillo: en aproximación, 3 o más rayos a 60 km en 15 min o núcleo a 60 km o menos confirmado por dos radares en la misma zona (desde el 23/11; antes, 50 y 40 km); naranja: a 20 km o menos; rojo: en la zona, a 10 km o menos. Un radar solo ya no confirma",
         "Limitación", "el haz del radar pasa alto, la sierra puede tapar y un solo radar puede dar ecos falsos de 60 a 70 dBZ", "Tendencia", "comparando con la lectura anterior", "Hace", (sat && sat.rayos ? sat.rayos.hace_min + " min los rayos" : "") + (rd ? ", radar de las " + String(rd.hora).slice(11, 16) : ""));
     poner("Tormenta", "rayo", conNivel(nivelT, valor, claveT), nivelT ? NIVEL_TORMENTA[nivelT] : "Tormenta", el("span", {}, [el("div", {}, lRayos), el("div", {}, lRadar), radarUnico ? el("div", { text: "Radar único: no se puede descartar eco falso." }) : null]), claveT);
   }
@@ -1408,8 +1411,13 @@ function vistaLugar(v) {
   var sv = el("section", { "class": "hoja bloque bloque-viene", "aria-label": "Próximos días" }, [
     el("p", { "class": "bloque-eti" }, ["PRÓXIMOS DÍAS ", el("span", { text: "· pronóstico de Open-Meteo" })]),
     dias.length ? tablaDias(dias) : el("p", { "class": "nota", text: "Sin pronóstico por días para este lugar." })]);
+  if (!window.PAGINA_PUBLICA) {
+    // Panel LAN: el armado de siempre. El tablero nuevo es de la página pública (el usuario, 17/11: el dashboard no lo usa).
+    v.appendChild(el("div", { "class": "hoy-grid" }, [bloqueAyer(), bloqueAhoraLocalidad(), bloqueHoy(), sv, panelFranjas()]));
+    v.appendChild(tiraDatos());
+    return;
+  }
   tableroDias(v, bloqueAhoraLocalidad, sv);
-  if (varianteActual() !== "I") v.appendChild(tiraDatos());
 }
 function pieFuentes() {
   var a = el("a", { href: "https://open-meteo.com/", rel: "noopener", target: "_blank", text: "Open-Meteo.com" });
@@ -1991,7 +1999,7 @@ function nivelVPS(parte) {
 }
 function tormentaCerca(ry, rc) {
   var c = [];
-  if (ry && ry.rayos_50km >= 3 && hay(ry.mas_cercano_km)) c.push({ km: ry.mas_cercano_km, rumbo: ry.rumbo });
+  if (ry && (hay(ry.rayos_60km) ? ry.rayos_60km : ry.rayos_50km) >= 3 && hay(ry.mas_cercano_km)) c.push({ km: ry.mas_cercano_km, rumbo: ry.rumbo });
   if (rc && hay(rc.nucleo_km)) c.push({ km: rc.nucleo_km, rumbo: rc.rumbo });
   if (!c.length) return null;
   c.sort(function (a, b) { return a.km - b.km; });
@@ -2015,7 +2023,7 @@ function medicion() {
     return { medido: true, fuente: a.NombreEstacion || a.Nombre || "una estación", km: e.km, temp: n(a.Temperatura_C), lluvia_dia: n(a.Lluvia_mm_Dia), lluvia_1h: n(a.Lluvia_mm_1hs), lluvia_20: n(a.Lluvia_mm_20min),
       viento: n(a.VelocidadViento_kmhs), hora: a.UltimaActualizacion ? new Date(a.UltimaActualizacion).toISOString() : null, red: "APRHi" };
   }
-  var d = L.datos || {}, med = typeof H === "function" ? H().medidos.ohmc_temp : null;
+  var d = L.datos || {}, Hf = typeof window.H === "function" ? window.H : null, med = Hf ? Hf().medidos.ohmc_temp : null;
   return med ? { medido: true, fuente: "la estación OHMC", km: null, temp: hay(d.temp) ? d.temp : null, lluvia_dia: hay(d.precip_dia) ? d.precip_dia : null, hora: med, red: "OHMC" } : { medido: false };
 }
 function mm1(v) { return fmt(Math.round(v * 10) / 10) + " mm"; }
@@ -2065,7 +2073,7 @@ function varianteActual() {
   if (!UI.variante) {
     var g = null;
     try { g = localStorage.getItem("clima-variante"); } catch (e) { /* sin guardar */ }
-    UI.variante = VARIANTES.some(function (x) { return x[0] === g; }) ? g : "F";
+    UI.variante = window.PAGINA_PUBLICA ? "I" : "A";
   }
   return UI.variante;
 }
@@ -2118,25 +2126,24 @@ function tableroDias(v, ahora, viene) {
     var rearmar = function () { pintarVista(); };
     if (tableroDias.mira.addEventListener) tableroDias.mira.addEventListener("change", rearmar); else tableroDias.mira.addListener(rearmar);
   }
-  // G (tres columnas): las franjas están siempre a la vista. A y F, como antes: con el botón de abrirlas.
-  var G = varianteActual() === "G";
+  // col3 (tres columnas): las franjas están siempre a la vista. A y F, como antes: con el botón de abrirlas.
+  var col3 = varianteActual() === "G";
   if (A) { var s = ahora(); s.classList.add("bloque-junto"); s.appendChild(franjaHoy({ sinBoton: movil })); ahoraHoy = [s]; }
-  else ahoraHoy = (varianteActual() === "H" || varianteActual() === "I") ? [] : [bloqueVariante(varianteActual(), movil, G)];
+  else ahoraHoy = (varianteActual() === "H" || varianteActual() === "I") ? [] : [bloqueVariante(varianteActual(), movil, col3)];
   // El radar del VPS, cuando la cáscara lo trae (la pública lo pide; el panel LAN tiene su bloque propio).
   var radar = UI.cerca ? radarEsquema(UI.cerca.datos, UI.cerca.op) : null;
   var nivR = UI.cerca && UI.cerca.datos.tormenta && UI.cerca.datos.tormenta.nivel;
   if (radar && (nivR === "rojo" || nivR === "naranja")) { radar.classList.add("primero"); ahoraHoy = [radar].concat(ahoraHoy); }
   else if (radar) ahoraHoy = ahoraHoy.concat([radar]);
-  v.appendChild(selectorVariante());
   // H: una sola caja de ayer a mañana; abajo, radar y próximos días. Sin pestañas, en el celular también.
   if (varianteActual() === "H") { tableroH(v, viene, radar, nivR === "rojo" || nivR === "naranja"); return; }
   if (varianteActual() === "I") { tableroI(v, viene, radar, nivR === "rojo" || nivR === "naranja"); return; }
   if (movil) {
     v.appendChild(pestanas([
-      ["ayer", "Ayer", [bloqueAyer(), panelFranjas({ desde: -1, hasta: 0, fijo: true, titulo: "AYER, POR FRANJAS", transpuesta: G })]],
-      ["hoy", "Hoy", ahoraHoy.concat([panelFranjas({ desde: 0, hasta: 2, fijo: true, titulo: "PRONÓSTICO POR FRANJAS", transpuesta: G })])],
-      ["proximos", "Próximos", [viene, panelFranjas({ desde: 1, hasta: 5, fijo: true, titulo: "POR FRANJAS", transpuesta: G })]]]));
-  } else if (!G) {
+      ["ayer", "Ayer", [bloqueAyer(), panelFranjas({ desde: -1, hasta: 0, fijo: true, titulo: "AYER, POR FRANJAS", transpuesta: col3 })]],
+      ["hoy", "Hoy", ahoraHoy.concat([panelFranjas({ desde: 0, hasta: 2, fijo: true, titulo: "PRONÓSTICO POR FRANJAS", transpuesta: col3 })])],
+      ["proximos", "Próximos", [viene, panelFranjas({ desde: 1, hasta: 5, fijo: true, titulo: "POR FRANJAS", transpuesta: col3 })]]]));
+  } else if (!col3) {
     // El radar va después de Próximos, para que esa columna no baje; con tormenta cerca va primero, a todo el ancho.
     var sinRadar = ahoraHoy.filter(function (n) { return n !== radar; }), radarPrimero = radar && radar.classList.contains("primero");
     v.appendChild(el("div", { "class": "hoy-grid" }, (radarPrimero ? [radar] : []).concat([bloqueAyer()], sinRadar, [viene], radar && !radarPrimero ? [radar] : [], [panelFranjas()])));
@@ -2503,8 +2510,8 @@ function recuadrosF(A, horas, x, op) {
   var hh = new Date(V.capturado).getHours(), noche = hh >= 18, tramo = horas.filter(function (z) { return noche || z.hoy; });
   var pico = tramo.reduce(function (p, b) { return !p || (b.prob || 0) > (p.prob || 0) ? b : p; }, null), mm = tramo.reduce(function (s_, z) { return s_ + z.mm; }, 0);
   var arriba = [], abajo = [];
-  function dato(atencion, nivel, ic, valor, pie, peso) {
-    var sc = (peso !== undefined ? peso : (PESOS_IND[ic] || 20)) + (atencion ? 100 : 0) + ({ rojo: 30, naranja: 20, amarillo: 10 }[nivel] || 0);
+  function dato(atencion, nivel, ic, valor, pie, pz) {
+    var sc = (pz !== undefined ? peso : (PESOS_IND[ic] || 20)) + (atencion ? 100 : 0) + ({ rojo: 30, naranja: 20, amarillo: 10 }[nivel] || 0);
     (atencion ? arriba : abajo).push({ nivel: nivel, ic: ic, valor: valor, pie: pie, score: sc });
   }
   // Reglas de PROPUESTA_DISENO_POR_SITUACION.md (usuario, 16/11): lo que cruza su umbral sube; lo que no tiene
@@ -2814,13 +2821,13 @@ function tableroH(v, viene, radar, primero) {
   // Derecha: mañana y los días siguientes, uno al lado del otro. En el celular, solo mañana; los siguientes van debajo.
   var zProx = el("div", { "class": "zona-h" }, [el("p", { "class": "bloque-eti", text: movil ? "MAÑANA" : "MAÑANA Y DÍAS SIGUIENTES" }),
     el("div", { "class": "mini-dias" }, (movil ? dias.slice(0, 1) : dias).map(function (d, k) { return miniDia(d, k === 0 ? "Mañana" : etiquetaDia({ fecha: d.fecha, desfase: 1 }), k === 0); }))]);
-  var seg = el("div", { "class": "segmentos", role: "group", "aria-label": "Ver el detalle por" }, [["hora", "Por hora"], ["franjas", "Por franjas"]].map(function (m) {
+  var segH = el("div", { "class": "segmentos", role: "group", "aria-label": "Ver el detalleH por" }, [["hora", "Por hora"], ["franjas", "Por franjas"]].map(function (m) {
     return el("button", { "aria-pressed": String(modo === m[0]), onclick: function () { UI.modoTiempo = m[0]; pintarVista(); } }, m[1]);
   }));
-  var detalle = modo === "hora" ? tiraCurva(A, horas, { cols: colsTiempo(A), centrar: "medio" }) : panelFranjas({ desde: -1, hasta: movil ? 3 : 5, fijo: true, titulo: "POR FRANJAS" });
+  var detalleH = modo === "hora" ? tiraCurva(A, horas, { cols: colsTiempo(A), centrar: "medio" }) : panelFranjas({ desde: -1, hasta: movil ? 3 : 5, fijo: true, titulo: "POR FRANJAS" });
   var caja = el("section", { "class": "hoja bloque caja-tiempo v-F", "aria-label": "Ayer, hoy y los días siguientes" }, [
     el("div", { "class": "zonas-h" }, [zAyer, zAhora, zProx]),
-    el("div", { "class": "detalle-h" }, [el("div", { "class": "th-cab" }, [el("p", { "class": "bloque-eti", text: modo === "hora" ? "POR HORA, DE AYER A MAÑANA" : "POR FRANJAS" }), seg]), detalle]),
+    el("div", { "class": "detalle-h" }, [el("div", { "class": "th-cab" }, [el("p", { "class": "bloque-eti", text: modo === "hora" ? "POR HORA, DE AYER A MAÑANA" : "POR FRANJAS" }), segH]), detalleH]),
     movil && dias.length > 1 ? el("div", { "class": "detalle-h" }, [el("p", { "class": "bloque-eti", text: "DÍAS SIGUIENTES" }),
       el("div", { "class": "mini-dias" }, dias.slice(1).map(function (d) { return miniDia(d, etiquetaDia({ fecha: d.fecha, desfase: 1 }), false); }))]) : null,
     recuadrosF(A, horas, x, { top: 6, fila: true }), pieF(A),
@@ -2856,7 +2863,7 @@ function tableroI(v, viene, radar, primero) {
   function rot(d, k) { return etiquetaDia({ fecha: d.fecha, desfase: 1 }); }
   var zProx = el("div", { "class": "zona-h zona-prox" }, [el("p", { "class": "bloque-eti", text: "PRONÓSTICO" }),
     el("div", { "class": "mini-dias" }, dias.map(function (d, k) { return miniDiaI(d, rot(d, k), k === 0, sel && d.fecha === sel.fecha); }))]);
-  var seg = el("div", { "class": "segmentos", role: "group", "aria-label": "Ver el detalle por" }, [["hora", "Por hora"], ["franjas", "Por franjas"]].map(function (m) {
+  var segI = el("div", { "class": "segmentos", role: "group", "aria-label": "Ver el detalle por" }, [["hora", "Por hora"], ["franjas", "Por franjas"]].map(function (m) {
     return el("button", { "aria-pressed": String(modo === m[0]), onclick: function () { UI.modoTiempo = m[0]; pintarVista(); } }, m[1]);
   }));
   var ahoraK = String(V.capturado).slice(0, 13).replace("T", " "), hAhora = new Date(V.capturado).getHours();
@@ -2878,7 +2885,7 @@ function tableroI(v, viene, radar, primero) {
     el("div", { "class": "vent vent-der" }, [el("p", { "class": "bloque-eti", text: (nombreSel ? nombreSel.toUpperCase() : "DÍA ELEGIDO") }), der])]);
   var caja = el("section", { "class": "hoja bloque caja-tiempo v-F", "aria-label": "Ahora y los días siguientes" }, [
     el("div", { "class": "zonas-i" + (ay ? "" : " sin-ayer") }, [zAyer, zAhora, zProx]),
-    el("div", { "class": "detalle-h" }, [el("div", { "class": "th-cab" }, [el("p", { "class": "bloque-eti", text: modo === "hora" ? "POR HORA" : "POR FRANJAS" }), seg]), ventanas])]);
+    el("div", { "class": "detalle-h" }, [el("div", { "class": "th-cab" }, [el("p", { "class": "bloque-eti", text: modo === "hora" ? "POR HORA" : "POR FRANJAS" }), segI]), ventanas])]);
   if (radar && primero) { radar.classList.add("primero"); v.appendChild(radar); }
   v.appendChild(caja);
   // Radar a la izquierda y otros datos al lado, en una sola franja.
@@ -2926,11 +2933,14 @@ function datosListaI(A) {
   var V = vivoV(), a = V.actual || {}, q = V.aire || {}, as = V.astro || {}, ex = extrasDeHoras(V), t = [];
   var hh = new Date(V.capturado).getHours(), hm = hh * 60 + new Date(V.capturado).getMinutes(), est = UI.estacion && UI.estacion.a;
   function aMin(x) { return parseInt(x.slice(0, 2), 10) * 60 + parseInt(x.slice(3, 5), 10); }
-  function r(peso, ic, val, eti) { if (hay(val) && val !== "") t.push({ peso: peso, ic: ic, val: val, eti: eti }); }
+  // Sensación, humedad y rocío son del modelo y se calculan con SU temperatura: si lo medido se aparta 3° o más, no valen
+  // (24/11: 23° de sensación con 28° medidos). Misma regla que ya usan los indicadores de AHORA.
+  var difMed = A.med && A.med.medido && hay(A.temp) && hay(A.modelo) && Math.abs(A.temp - A.modelo) >= 3;
+  function r(pz, ic, val, eti) { if (hay(val) && val !== "") t.push({ peso: pz, ic: ic, val: val, eti: eti }); }
   r(hay(A.viento) ? 10 + A.viento * 1.5 : 0, "viento", hay(A.viento) ? Math.round(A.viento) + " km/h" : null, A.dir ? "Viento " + A.dir : "Viento");
-  r(hay(A.hum) ? 8 + (A.hum < 25 || A.hum > 90 ? 42 : 0) : 0, "humedad", hay(A.hum) ? fmt(A.hum) + " %" : null, "Humedad");
-  r(hay(a.feelslike_c) ? 10 + (hay(A.temp) ? Math.abs(a.feelslike_c - A.temp) * 8 : 0) + (a.feelslike_c >= 34 || a.feelslike_c <= 3 ? 40 : 0) : 0, "termo", hay(a.feelslike_c) ? Math.round(a.feelslike_c) + "°" : null, "Sensación");
-  r(hay(a.dewpoint_c) ? 8 + (a.dewpoint_c >= 18 ? 30 : 0) : 0, "humedad", hay(a.dewpoint_c) ? Math.round(a.dewpoint_c) + "°" : null, "Rocío");
+  if (!difMed) r(hay(A.hum) ? 8 + (A.hum < 25 || A.hum > 90 ? 42 : 0) : 0, "humedad", hay(A.hum) ? fmt(A.hum) + " %" : null, "Humedad");
+  if (!difMed) r(hay(a.feelslike_c) ? 10 + (hay(A.temp) ? Math.abs(a.feelslike_c - A.temp) * 8 : 0) + (a.feelslike_c >= 34 || a.feelslike_c <= 3 ? 40 : 0) : 0, "termo", hay(a.feelslike_c) ? Math.round(a.feelslike_c) + "°" : null, "Sensación");
+  if (!difMed) r(hay(a.dewpoint_c) ? 8 + (a.dewpoint_c >= 18 ? 30 : 0) : 0, "humedad", hay(a.dewpoint_c) ? Math.round(a.dewpoint_c) + "°" : null, "Rocío");
   r(hay(a.pressure_mb) ? 6 + Math.abs(a.pressure_mb - 1013) * 1.5 : 0, "presion", hay(a.pressure_mb) ? String(a.pressure_mb) : null, "hPa");
   r(hh >= 7 && hh < 19 && hay(a.uv) ? 5 + a.uv * 8 : 5, "sol", hay(a.uv) ? String(Math.round(a.uv)) : null, "UV");
   r(hay(q.epa) ? 6 + (q.epa >= 2 ? 25 * (q.epa - 1) : 0) : 0, "hoja", hay(q.epa) ? String(AIRE_EPA[q.epa] || q.epa) : null, "Aire");
@@ -3036,6 +3046,7 @@ var PESOS_IND = { rayo: 80, fuego: 75, lluvia: 60, sol: 40, viento: 35, hoja: 35
 
 var LUGAR_INICIAL = { nombre: "La Población, Córdoba", lat: -32.0667, lon: -65.0333 };
 var ACTUALIZAR_MIN = 15;
+var PAGINA_PUBLICA = true;
 var API = "https://api.open-meteo.com/v1/forecast?", AIRE = "https://air-quality-api.open-meteo.com/v1/air-quality?", BUSCAR = "https://geocoding-api.open-meteo.com/v1/search?";
 var WMO = { 0: "Despejado", 1: "Mayormente despejado", 2: "Parcialmente nublado", 3: "Nublado", 45: "Niebla", 48: "Niebla con escarcha",
   51: "Llovizna débil", 53: "Llovizna", 55: "Llovizna intensa", 56: "Llovizna helada", 57: "Llovizna helada intensa",
@@ -3169,9 +3180,9 @@ function armarRadar(lugar) {
   var op = { radioKm: R, cuadros: cuadros, sinHumo: !esLP };
   if (!cer || dLP > 90) op.notaRadar = "Radar: solo alrededor de La Población (OHMC)";
   else if (cer.nucleos) {
-    function mover(q) { var g = desdeKmRumbo(lp.lat, lp.lon, q.km, q.rumbo), p = rel(g.lat, g.lon); return { km: p.km, rumbo: p.rumbo, hora: q.hora }; }
+    function moverNucleo(q) { var g = desdeKmRumbo(lp.lat, lp.lon, q.km, q.rumbo), p = rel(g.lat, g.lon); return { km: p.km, rumbo: p.rumbo, hora: q.hora }; }
     datos.nucleos = { hora: cer.nucleos.hora, lista: (cer.nucleos.lista || []).map(function (q) {
-      var m = mover(q); return { radar: q.radar, km: m.km, rumbo: m.rumbo, dbz: q.dbz, radares: q.radares, hora: q.hora, trayecto: (q.trayecto || []).map(mover) };
+      var m = moverNucleo(q); return { radar: q.radar, km: m.km, rumbo: m.rumbo, dbz: q.dbz, radares: q.radares, hora: q.hora, trayecto: (q.trayecto || []).map(moverNucleo) };
     }) };
   } else datos.nucleos = null;
   if (esLP) datos.humo = cer.humo;
