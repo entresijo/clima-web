@@ -1418,6 +1418,7 @@ function vistaLugar(v) {
     return;
   }
   tableroDias(v, bloqueAhoraLocalidad, sv);
+  if (varianteActual() !== "I") v.appendChild(tiraDatos());
 }
 function pieFuentes() {
   var a = el("a", { href: "https://open-meteo.com/", rel: "noopener", target: "_blank", text: "Open-Meteo.com" });
@@ -2073,7 +2074,8 @@ function varianteActual() {
   if (!UI.variante) {
     var g = null;
     try { g = localStorage.getItem("clima-variante"); } catch (e) { /* sin guardar */ }
-    UI.variante = window.PAGINA_PUBLICA ? "I" : "A";
+    // Prototipo: vuelve el selector con todas las variantes; la I es la de entrada.
+    UI.variante = VARIANTES.some(function (x) { return x[0] === g; }) ? g : "I";
   }
   return UI.variante;
 }
@@ -2135,6 +2137,7 @@ function tableroDias(v, ahora, viene) {
   var nivR = UI.cerca && UI.cerca.datos.tormenta && UI.cerca.datos.tormenta.nivel;
   if (radar && (nivR === "rojo" || nivR === "naranja")) { radar.classList.add("primero"); ahoraHoy = [radar].concat(ahoraHoy); }
   else if (radar) ahoraHoy = ahoraHoy.concat([radar]);
+  v.appendChild(selectorVariante());
   // H: una sola caja de ayer a mañana; abajo, radar y próximos días. Sin pestañas, en el celular también.
   if (varianteActual() === "H") { tableroH(v, viene, radar, nivR === "rojo" || nivR === "naranja"); return; }
   if (varianteActual() === "I") { tableroI(v, viene, radar, nivR === "rojo" || nivR === "naranja"); return; }
